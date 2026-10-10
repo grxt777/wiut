@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Карта банкоматов — Cash Flow AI</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet Routing Machine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="/dashboard/css/ui.css?v=1" />
+  <link rel="stylesheet" href="/dashboard/css/map.css?v=brand1" />
+
+</head>
+<body>
+
+<!-- Loader -->
+<div id="loader">
+  <div class="spinner"></div>
+  <p>Загрузка данных банкоматов...</p>
+</div>
+
+<header>
+  <h1>Cash Flow AI</h1>
+  <span class="badge">Ipak Yo'li Bank · Ташкент</span>
+  <div class="spacer"></div>
+  <nav data-app-nav></nav>
+  <script src="/dashboard/js/app-nav.js?v=1"></script>
+  <span class="app-clock" title="Время симуляции"><i data-lucide="clock-3"></i>Обновлено <b id="sim-time">—</b></span>
+</header>
+
+<div class="app-shell">
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-box">
+    <div class="kpi-icon"><i data-lucide="building-2"></i></div>
+    <span class="stat-label">Всего ATM</span>
+    <span class="stat-value" id="s-total">—</span>
+  </div>
+  <div class="stat-box critical-tone">
+    <div class="kpi-icon"><i data-lucide="triangle-alert"></i></div>
+    <span class="stat-label">Критично</span>
+    <span class="stat-value red" id="s-critical">—</span>
+  </div>
+  <div class="stat-box warning-tone">
+    <div class="kpi-icon"><i data-lucide="circle-alert"></i></div>
+    <span class="stat-label">Предупреждение</span>
+    <span class="stat-value yellow" id="s-warning">—</span>
+  </div>
+  <div class="stat-box success-tone">
+    <div class="kpi-icon"><i data-lucide="shield-check"></i></div>
+    <span class="stat-label">В норме</span>
+    <span class="stat-value green" id="s-ok">—</span>
+  </div>
+  <div class="stat-box">
+    <div class="kpi-icon"><i data-lucide="truck"></i></div>
+    <span class="stat-label">Выезды сегодня</span>
+    <span class="stat-value" id="s-inc">—</span>
+  </div>
+  <div class="stat-box purple-tone" style="border-left:2px solid #6366f1">
+    <div class="kpi-icon"><i data-lucide="brain-circuit"></i></div>
+    <span class="stat-label" style="color:#4f46e5">ML · Высокий риск</span>
+    <span class="stat-value" id="s-ml-high" style="color:#818cf8">—</span>
+  </div>
+  <div class="stat-box purple-tone" style="border-left:2px solid #6366f1">
+    <div class="kpi-icon"><i data-lucide="activity"></i></div>
+    <span class="stat-label" style="color:#4f46e5">ML · Средний риск</span>
+    <span class="stat-value" id="s-ml-med" style="color:#818cf8">—</span>
+  </div>
+  <div class="stat-box" style="border-left:2px solid #7c3aed" id="salary-box">
+    <div class="kpi-icon"><i data-lucide="calendar-days"></i></div>
+    <span class="stat-label" style="color:#7c3aed">Зарплатный день</span>
+    <span class="stat-value" id="s-salary" style="color:#a78bfa">—</span>
+  </div>
+  <div class="stat-box" style="border-left:2px solid #f59e0b">
+    <div class="kpi-icon"><i data-lucide="archive"></i></div>
+    <span class="stat-label" style="color:#d97706">Кассеты нужны</span>
+    <span class="stat-value" id="s-cassette" style="color:#fbbf24">—</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: ATM list -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <span>Банкоматы</span>
+      <span id="list-count" style="color:#3b82f6;font-size:11px;font-weight:700;"></span>
+    </div>
+    <!-- Поиск по регионам -->
+    <div class="search-box-container" style="padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; background: var(--surface-2);">
+      <div style="position: relative; flex: 1;">
+        <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); pointer-events: none;"></i>
+        <input type="text" id="left-search-input" placeholder="Поиск по региону..." style="width: 100%; padding: 8px 12px 8px 30px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; outline: none; background: #fff; color: var(--text); box-shadow: var(--shadow-sm);" oninput="onLeftSearchInput()">
+      </div>
+    </div>
+    <!-- Баннер активного фильтра -->
+    <div id="filter-banner" style="display: none; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-3); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--primary);">
+      <span>Регион: <span id="filter-region-name">—</span> (<span id="filter-count">—</span> ATM)</span>
+      <button onclick="clearRegionFilter()" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 11px;">
+        Сбросить <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+      </button>
+    </div>
+    <div class="atm-list" id="atm-list"></div>
+
+    <div class="route-panel">
+      <h3>Маршрут инкассации</h3>
+
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <div style="flex:1;">
+          <div style="font-size:10px;color:#667085;margin-bottom:4px;font-weight:700;">Макс. ATM / рейс</div>
+          <select id="max-stops" style="width:100%;background:#fff;border:1px solid #e5eaf3;color:#111827;border-radius:12px;padding:8px;font-size:12px;">
+            <option value="8">8 точек</option>
+            <option value="12" selected>12 точек</option>
+            <option value="16">16 точек</option>
+            <option value="99">Без лимита</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:10px;color:#667085;margin-bottom:4px;font-weight:700;">Скорость</div>
+          <select id="speed-kmh" style="width:100%;background:#fff;border:1px solid #e5eaf3;color:#111827;border-radius:12px;padding:8px;font-size:12px;">
+            <option value="20">20 км/ч</option>
+            <option value="30" selected>30 км/ч</option>
+            <option value="40">40 км/ч</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-danger"  onclick="buildRoute('critical')" style="margin-bottom:4px;">
+        <i data-lucide="siren" class="icon-inline"></i> Только критичные
+      </button>
+      <button class="btn btn-primary" onclick="buildRoute('warning')" style="margin-bottom:4px;">
+        <i data-lucide="route" class="icon-inline"></i> Критичные + предупреждения
+      </button>
+      <a class="btn btn-outline" href="/dashboard/incassation.html" style="margin-bottom:6px;text-decoration:none;text-align:center">
+        Календарь маршрутов
+      </a>
+      <button class="btn btn-outline" onclick="clearRoute()"><i data-lucide="x" class="icon-inline"></i> Очистить маршрут</button>
+
+      <div id="route-info" style="margin-top:8px;padding:10px;background:#f8fafc;border:1px solid #e5eaf3;border-radius:12px;font-size:11px;color:#667085;line-height:1.5;display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Right: Map -->
+  <div class="map-area">
+    <div id="map"></div>
+
+    <!-- Floating Compass Button -->
+    <button id="compass-btn" class="map-floating-btn" onclick="openRegionModal()" title="Выбор региона">
+      <i data-lucide="compass"></i>
+    </button>
+
+    <!-- Floating ATMs Toggle Button -->
+    <button id="atms-toggle-btn" class="map-floating-btn" onclick="toggleAtmsLayer()" title="Показать/скрыть банкоматы" style="top:122px;background:#2563eb;color:#fff;border-color:#2563eb;">
+      <i data-lucide="credit-card"></i>
+    </button>
+
+    <!-- Floating Branches Toggle Button -->
+    <button id="branches-toggle-btn" class="map-floating-btn" onclick="toggleBranchesLayer()" title="Показать/скрыть филиалы" style="top:164px;">
+      <i data-lucide="building-2"></i>
+    </button>
+
+    <!-- Route Sidebar -->
+    <div id="route-sidebar">
+      <div class="rs-header">
+        <h4><i data-lucide="truck" class="icon-inline"></i> Маршруты инкассации</h4>
+        <button class="rs-close" onclick="closeSidebar()"><i data-lucide="x"></i></button>
+      </div>
+      <div class="rs-summary">
+        <div class="rs-stat">
+          <span class="rs-stat-label">Машин</span>
+          <span class="rs-stat-val" id="rs-cars-count">—</span>
+        </div>
+        <div class="rs-stat">
+          <span class="rs-stat-label">Остановок</span>
+          <span class="rs-stat-val" id="rs-stops-count">—</span>
+        </div>
+        <div class="rs-stat">
+          <span class="rs-stat-label">~Расстояние</span>
+          <span class="rs-stat-val" id="rs-distance">—</span>
+        </div>
+        <div class="rs-stat">
+          <span class="rs-stat-label">~Время</span>
+          <span class="rs-stat-val" id="rs-time">—</span>
+        </div>
+      </div>
+      <div class="rs-cars" id="rs-cars-list"></div>
+    </div>
+
+    <!-- Branch cash detail panel -->
+    <div id="branch-cash-panel">
+      <div class="rs-header">
+        <h4><i data-lucide="wallet" class="icon-inline"></i> <span id="bcp-title">Касса филиала</span></h4>
+        <button class="rs-close" onclick="closeBranchCashPanel()" title="Закрыть"><i data-lucide="x"></i></button>
+      </div>
+      <div class="bcp-body" id="bcp-body"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Modal Window for Region Search -->
+<div id="region-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3><i data-lucide="compass" class="icon-inline"></i> Выбор региона</h3>
+      <button class="modal-close" onclick="closeRegionModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="region-select">Выберите регион:</label>
+        <select id="region-select" onchange="onRegionChange()">
+          <option value="">-- Все регионы --</option>
+        </select>
+      </div>
+      
+      <div class="atm-count-badge" id="modal-atm-count">
+        <span>Выбрано банкоматов:</span>
+        <span id="modal-atm-count-val">0</span>
+      </div>
+      
+      <div class="modal-atm-list-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Список банкоматов в регионе:</span>
+        <button type="button" id="modal-select-all-btn" onclick="toggleAllModalAtms()"
+          style="border:1px solid var(--border);background:#fff;color:var(--primary);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer;text-transform:none;letter-spacing:0">
+          Выбрать все
+        </button>
+      </div>
+      <div class="modal-atm-list" id="modal-atm-list">
+        <!-- ATMs list will be populated here -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeRegionModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="performRegionSearch()"><i data-lucide="search" class="icon-inline"></i> Найти</button>
+    </div>
+  </div>
+</div>
+
+<script src="/dashboard/js/map-app.js?v=zoom4"></script>
+<script src="/dashboard/js/geo-panel.js?v=6"></script>
+</body>
+</html>

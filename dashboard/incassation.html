@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Календарь инкассаций — Cash Flow AI</title>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="/dashboard/css/ui.css?v=1" />
+  <style>
+    * { box-sizing: border-box }
+    body { margin: 0; background: #fff; color: #202124; font: 14px Arial, sans-serif }
+    :root { --ui-accent: #6f42c1; --ui-accent-soft: #f3e8ff; --ui-line: #dadce0; }
+    header {
+      height: 64px; border-bottom: 1px solid #dadce0;
+      display: flex; align-items: center; padding: 0 24px; gap: 12px;
+    }
+    header h1 { font-size: 22px; font-weight: 400; margin: 0 4px 0 0; white-space: nowrap }
+    .logo { color: #6f42c1; display: flex }
+    .month-nav { display: inline-flex; align-items: center; gap: 6px }
+    .month-nav .ui-btn { color: #3c4043 }
+    .month { font-size: 20px; margin-left: 6px; white-space: nowrap }
+    .spacer { flex: 1 }
+    .layout { display: grid; grid-template-columns: 250px 1fr 380px; min-height: calc(100vh - 64px) }
+    aside { border-right: 1px solid #dadce0; padding: 18px 16px }
+    .create { width: 100%; height: 40px; color: #3c4043; box-shadow: 0 1px 3px rgba(60, 64, 67, .18) }
+    .create svg { color: #6f42c1 }
+    .create:disabled { cursor: wait }
+    .mini-title { margin: 27px 0 12px; font-size: 12px; font-weight: bold; color: #5f6368; text-transform: uppercase }
+    .legend { display: flex; align-items: center; gap: 9px; margin: 13px 4px; color: #5f6368 }
+    .dot { height: 10px; width: 10px; border-radius: 50% }
+    .note { font-size: 12px; line-height: 1.55; color: #5f6368; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-top: 25px }
+    .main { overflow: auto }
+    .toolbar {
+      height: 64px; display: flex; align-items: center; padding: 0 20px;
+      border-bottom: 1px solid #dadce0; gap: 10px;
+    }
+    .toolbar .ui-seg > button { color: #3c4043 }
+    .toolbar .ui-seg > button.active { color: #fff; background: #6f42c1; box-shadow: none }
+    .status { margin-left: auto; color: #5f6368; font-size: 12px }
+    .calendar { min-width: 900px; display: grid; grid-template-columns: repeat(7, 1fr) }
+    .dow {
+      height: 46px; border-bottom: 1px solid #dadce0; text-align: center;
+      padding-top: 12px; font-size: 11px; font-weight: bold; color: #70757a; text-transform: uppercase;
+    }
+    .day {
+      height: calc((100vh - 174px) / 5); min-height: 118px;
+      border-right: 1px solid #e8eaed; border-bottom: 1px solid #e8eaed;
+      padding: 6px; overflow: hidden; cursor: pointer;
+    }
+    .day:nth-child(7n) { border-right: 0 }
+    .day.selected { background: #f3e8ff; outline: 2px solid #6f42c1; outline-offset: -2px }
+    .date {
+      font-size: 12px; color: #5f6368; width: 25px; height: 25px;
+      line-height: 25px; text-align: center; border-radius: 50%; margin-bottom: 4px;
+    }
+    .today .date { background: #6f42c1; color: #fff }
+    .outside { background: #fafafa }
+    .outside .date { color: #adb1b7 }
+    .day-sum { font-size: 10px; color: #5f6368; margin: 0 0 4px; font-weight: 700 }
+    .chip {
+      border-radius: 4px; padding: 3px 5px; margin: 2px 0; font-size: 10px;
+      line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chip.critical { background: #fce8e6; color: #a50e0e; border-left: 3px solid #d93025 }
+    .chip.high { background: #fef7e0; color: #8d5f00; border-left: 3px solid #f9ab00 }
+    .chip.planned { background: #e8f0fe; color: #174ea6; border-left: 3px solid #4285f4 }
+    .more { font-size: 10px; font-weight: bold; color: #5f6368; padding: 2px 0 }
+    .panel {
+      border-left: 1px solid #dadce0; background: #fafbff;
+      display: flex; flex-direction: column; min-height: 0;
+    }
+    .panel-head { padding: 16px 18px 12px; border-bottom: 1px solid #dadce0; background: #fff }
+    .panel-head h2 { margin: 0; font-size: 15px; font-weight: 700 }
+    .panel-head p { margin: 6px 0 0; color: #5f6368; font-size: 12px }
+    .panel-body { overflow: auto; padding: 10px 12px 20px; flex: 1 }
+    .region-card {
+      background: #fff; border: 1px solid #e8eaed; border-radius: 10px;
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .region-card h3 {
+      margin: 0; padding: 10px 12px; font-size: 13px;
+      display: flex; justify-content: space-between; gap: 8px; align-items: center;
+      background: #f8f9fa; border-bottom: 1px solid #eee;
+    }
+    .region-card h3 span { color: #5f6368; font-weight: 600; font-size: 11px }
+    .trip {
+      padding: 9px 12px; border-bottom: 1px solid #f1f3f4; cursor: pointer; font-size: 12px;
+    }
+    .trip:last-child { border-bottom: 0 }
+    .trip:hover { background: #f8f5ff }
+    .trip b { display: block; margin-bottom: 3px }
+    .trip .meta { color: #5f6368; font-size: 11px }
+    .prio { font-size: 10px; font-weight: 800; text-transform: uppercase }
+    .prio.critical { color: #d93025 }
+    .prio.high { color: #e37400 }
+    .prio.planned { color: #1a73e8 }
+    .event {
+      border-radius: 4px; padding: 4px 6px; margin: 3px 0; font-size: 11px;
+      line-height: 1.28; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .event.critical { background: #fce8e6; color: #a50e0e; border-left: 3px solid #d93025 }
+    .event.high { background: #fef7e0; color: #8d5f00; border-left: 3px solid #f9ab00 }
+    .event.planned { background: #e8f0fe; color: #174ea6; border-left: 3px solid #4285f4 }
+    .modal {
+      position: fixed; inset: 0; background: #0006; display: none;
+      align-items: center; justify-content: center; z-index: 10;
+    }
+    .modal.open { display: flex }
+    .dialog {
+      width: min(560px, calc(100vw - 28px)); max-height: 86vh;
+      background: #fff; border-radius: 10px; box-shadow: 0 12px 30px #0005; overflow: auto;
+    }
+    .dialog-head { padding: 17px 20px; background: #6f42c1; color: #fff; font-size: 17px }
+    .dialog-body { padding: 20px; line-height: 1.7 }
+    .kv { display: grid; grid-template-columns: 155px 1fr; border-bottom: 1px solid #eee; padding: 8px 0 }
+    .kv b { color: #5f6368 }
+    .close { float: right; background: none; border: 0; color: #fff; font-size: 22px; cursor: pointer }
+    .stops { margin: 0; padding-left: 18px; font-size: 13px }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr }
+      .side {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+        border-right: 0; border-bottom: 1px solid #dadce0; padding: 12px;
+      }
+      .side .create { width: auto }
+      .side .legend { margin: 0 }
+      .side .mini-title, .side .note { display: none }
+      .panel { border-left: 0; border-top: 1px solid #dadce0; min-height: 320px }
+      header { padding: 0 12px }
+      .month { font-size: 16px }
+      .calendar { min-width: 760px }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo"><i data-lucide="calendar-days"></i></span>
+    <h1>Инкассации</h1>
+    <div class="month-nav">
+      <button class="ui-btn ui-btn--ghost ui-btn--icon" type="button" onclick="changeMonth(-1)" title="Предыдущий месяц" aria-label="Предыдущий месяц"><i data-lucide="chevron-left"></i></button>
+      <button class="ui-btn ui-btn--ghost ui-btn--icon" type="button" onclick="changeMonth(1)" title="Следующий месяц" aria-label="Следующий месяц"><i data-lucide="chevron-right"></i></button>
+      <button class="ui-btn ui-btn--ghost" type="button" onclick="today()">Сегодня</button>
+    </div>
+    <span class="month" id="month"></span>
+    <span class="spacer"></span>
+    <nav data-app-nav></nav>
+    <script src="/dashboard/js/app-nav.js?v=1"></script>
+  </header>
+  <div class="layout">
+    <aside class="side">
+      <button class="ui-btn ui-btn--ghost create" id="rebuildBtn" type="button" onclick="rebuildPlan()">
+        <i data-lucide="sparkles"></i> Обновить план
+      </button>
+      <div class="mini-title">Маршруты</div>
+      <div class="legend"><span class="dot" style="background:#d93025"></span> Критично (деньги закончатся до ближайшего выезда или остаток &lt; 20%)</div>
+      <div class="legend"><span class="dot" style="background:#f9ab00"></span> Предупреждение (ML: выезд нужен в ближайший рабочий день)</div>
+      <div class="legend"><span class="dot" style="background:#4285f4"></span> Плановый выезд</div>
+      <div class="note">
+        <b>Как считается</b><br>
+        Срок визита и сумма загрузки — из ML-прогноза спроса (XGBoost) по истории транзакций: выезд, пока с вероятностью 99%
+        хватает остатка, загрузка — на цикл с тем же запасом. Банкоматы с остатком &lt; 20% едут в любом случае;
+        для банкоматов без прогноза — пороги остатка (&lt; 20% / &lt; 40%). Рейс выходит из филиала «Инкассация = 1» своего вилоята.
+        Даты — рабочие дни по 8 часов, начиная с сегодня (UTC+5).
+      </div>
+    </aside>
+    <section class="main">
+      <div class="toolbar">
+        <div class="ui-seg" role="group" aria-label="Горизонт плана">
+          <button type="button" class="active" data-horizon="2" onclick="setHorizon(2, this)">2 дня</button>
+          <button type="button" data-horizon="7" onclick="setHorizon(7, this)">7 дней</button>
+          <button type="button" data-horizon="14" onclick="setHorizon(14, this)">14 дней</button>
+        </div>
+        <span class="status" id="status">Загрузка календаря…</span>
+      </div>
+      <div class="calendar" id="dow"></div>
+      <div class="calendar" id="grid"></div>
+    </section>
+    <aside class="panel">
+      <div class="panel-head">
+        <h2 id="panelTitle">Регионы дня</h2>
+        <p id="panelMeta">Выберите день в календаре</p>
+      </div>
+      <div class="panel-body" id="panelBody">
+        <div class="empty-panel">Нажмите на дату — рейсы сгруппируются по вилоятам.</div>
+      </div>
+    </aside>
+  </div>
+  <div class="modal" id="modal">
+    <div class="dialog">
+      <div class="dialog-head">Карточка рейса <button class="close" type="button" onclick="closeModal()">×</button></div>
+      <div class="dialog-body" id="dialog"></div>
+    </div>
+  </div>
+  <script>
+    try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+    const base = location.origin;
+    const names = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    document.getElementById('dow').innerHTML = names.map((x) => `<div class="dow">${x}</div>`).join('');
+
+    let cursor = new Date();
+    let allEvents = [];
+    let events = [];
+    let horizon = 2;
+    let selectedDay = null;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function ymd(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    function todayKeySafe() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    function eventDate(e) {
+      if (e.planned_date) return e.planned_date;
+      return (e.due_at || '').slice(0, 10);
+    }
+    function todayKey() { return todayKeySafe(); }
+    function addDays(iso, n) {
+      const [y, m, d] = iso.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setDate(dt.getDate() + n);
+      return ymd(dt);
+    }
+    function ruMonth(d) {
+      return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    }
+    function formatHumanDate(iso) {
+      if (!iso) return '—';
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' });
+    }
+    function moneyMln(v) {
+      const n = Number(v) || 0;
+      return (n / 1e6).toFixed(n >= 1e9 ? 0 : 1) + ' млн';
+    }
+    function shortRegion(name) {
+      return String(name || 'Регион')
+        .replace(' вилояти', '')
+        .replace(' Республикаси', '')
+        .replace(' шаҳри', '');
+    }
+    function stopCount(e) { return e.stop_count || (e.stops || []).length; }
+    function worstPrio(list) {
+      if (list.some((e) => e.priority === 'critical')) return 'critical';
+      if (list.some((e) => e.priority === 'high')) return 'high';
+      return 'planned';
+    }
+    function groupByRegion(list) {
+      const map = {};
+      list.forEach((e) => {
+        const r = e.region || 'Не указан';
+        (map[r] || (map[r] = [])).push(e);
+      });
+      return Object.entries(map).sort((a, b) => b[1].length - a[1].length);
+    }
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+    }
+
+    function visibleEvents() {
+      const from = todayKey();
+      const to = addDays(from, horizon);
+      return allEvents.filter((e) => {
+        const d = eventDate(e);
+        return d >= from && d < to;
+      });
+    }
+
+    function render() {
+      document.getElementById('month').textContent = ruMonth(cursor).replace(/^./, (x) => x.toUpperCase());
+      const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+      const offset = (first.getDay() + 6) % 7;
+      const start = new Date(first);
+      start.setDate(first.getDate() - offset);
+      let html = '';
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const k = ymd(d);
+        const dayEvents = events.filter((e) => eventDate(e) === k);
+        const groups = groupByRegion(dayEvents);
+        const isToday = k === todayKey();
+        const sel = k === selectedDay ? ' selected' : '';
+        html += `<div class="day ${d.getMonth() !== cursor.getMonth() ? 'outside' : ''} ${isToday ? 'today' : ''}${sel}" onclick="selectDay('${k}')">`;
+        html += `<div class="date">${d.getDate()}</div>`;
+        if (dayEvents.length) {
+          const atms = dayEvents.reduce((s, e) => s + stopCount(e), 0);
+          html += `<div class="day-sum">${groups.length} вилоят · ${dayEvents.length} рейс · ${atms} ATM</div>`;
+          html += groups.slice(0, 3).map(([region, trips]) => {
+            const atmsR = trips.reduce((s, e) => s + stopCount(e), 0);
+            return `<div class="chip ${worstPrio(trips)}">${shortRegion(region)} · ${trips.length}р / ${atmsR} ATM</div>`;
+          }).join('');
+          if (groups.length > 3) html += `<div class="more">+ ещё ${groups.length - 3} вилоят</div>`;
+        }
+        html += '</div>';
+      }
+      document.getElementById('grid').innerHTML = html;
+      renderPanel();
+    }
+
+    function selectDay(k) {
+      selectedDay = k;
+      render();
+    }
+
+    function renderPanel() {
+      if (!selectedDay) {
+        document.getElementById('panelTitle').textContent = 'Регионы дня';
+        document.getElementById('panelMeta').textContent = 'Выберите день в календаре';
+        document.getElementById('panelBody').innerHTML =
+          '<div class="empty-panel">Нажмите на дату — рейсы сгруппируются по вилоятам.</div>';
+        return;
+      }
+      const dayEvents = events.filter((e) => eventDate(e) === selectedDay);
+      const groups = groupByRegion(dayEvents);
+      document.getElementById('panelTitle').textContent = formatHumanDate(selectedDay);
+      if (!dayEvents.length) {
+        document.getElementById('panelMeta').textContent = 'В этот день рейсов нет';
+        document.getElementById('panelBody').innerHTML = '<div class="empty-panel">Выберите другую дату или нажмите «Обновить план».</div>';
+        return;
+      }
+      const atms = dayEvents.reduce((s, e) => s + stopCount(e), 0);
+      document.getElementById('panelMeta').textContent =
+        `${groups.length} вилоят · ${dayEvents.length} рейс · ${atms} банкоматов`;
+      document.getElementById('panelBody').innerHTML = groups.map(([region, trips]) => {
+        const atmsR = trips.reduce((s, e) => s + stopCount(e), 0);
+        const refill = trips.reduce((s, e) => s + (Number(e.recommended_refill) || 0), 0);
+        const tripsHtml = trips.map((e) => {
+          const iEv = allEvents.indexOf(e);
+          const p = e.priority || 'planned';
+          const label = (e.label || '').split(' · ').slice(1).join(' · ') || e.terminal_id || 'Рейс';
+          return `<div class="trip" onclick="details(${iEv})">
+            <b>${label} <span class="prio ${p}">${p === 'critical' ? 'срочно' : p === 'high' ? 'сегодня' : 'план'}</span></b>
+            <div class="meta">${stopCount(e)} ATM · ${e.est_time_min || '—'} мин · ${e.distance_km != null ? e.distance_km + ' км' : '—'} · ${moneyMln(e.recommended_refill)}</div>
+          </div>`;
+        }).join('');
+        return `<div class="region-card">
+          <h3>${region}<span>${trips.length} рейс · ${atmsR} ATM · ${moneyMln(refill)}</span></h3>
+          ${tripsHtml}
+        </div>`;
+      }).join('');
+    }
+
+    function changeMonth(n) {
+      cursor.setMonth(cursor.getMonth() + n);
+      render();
+    }
+    function today() {
+      cursor = new Date();
+      selectedDay = todayKey();
+      render();
+    }
+    function setHorizon(n, btn) {
+      horizon = n;
+      document.querySelectorAll('.toolbar button[data-horizon]').forEach((x) => x.classList.remove('active'));
+      btn.classList.add('active');
+      events = visibleEvents();
+      setStatus();
+      render();
+    }
+    function setStatus() {
+      const regs = new Set(events.map((e) => e.region).filter(Boolean));
+      document.getElementById('status').textContent = allEvents.length
+        ? `Рейсов: ${allEvents.length} · в окне ${horizon} дн.: ${events.length} · вилоятов: ${regs.size}`
+        : 'Календарь пуст — нажмите «Обновить план».';
+    }
+
+    async function loadCalendar() {
+      document.getElementById('status').textContent = 'Загрузка календаря…';
+      try {
+        const res = await fetch(`${base}/api/incassation/calendar`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const cal = await res.json();
+        allEvents = cal.events || cal.trips || [];
+        events = visibleEvents();
+        if (!selectedDay) selectedDay = todayKey();
+        if (!events.some((e) => eventDate(e) === selectedDay) && events.length) {
+          selectedDay = eventDate(events[0]);
+        }
+        // Show the month that contains selected day / first event
+        if (selectedDay) {
+          const [y, m] = selectedDay.split('-').map(Number);
+          cursor = new Date(y, m - 1, 1);
+        }
+        setStatus();
+        render();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('status').textContent = 'Ошибка загрузки: ' + (e.message || e);
+        document.getElementById('grid').innerHTML =
+          '<div style="grid-column:1/-1;padding:40px;color:#a50e0e;font-weight:700">Не удалось загрузить календарь. Обновите страницу или нажмите «Обновить план».</div>';
+      }
+    }
+
+    async function rebuildPlan() {
+      const btn = document.getElementById('rebuildBtn');
+      btn.disabled = true;
+      document.getElementById('status').textContent = 'Строим маршруты по текущим остаткам…';
+      try {
+        const res = await fetch(`${base}/api/routes/incassation?status=warning&speed_kmh=30&max_stops=12&snap_roads=true`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persist: true, states: [] }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        await loadCalendar();
+        const saved = data.saved_to_calendar || 0;
+        const extra = (data.unserved_regions || []).length
+          ? ` · без филиала: ${(data.unserved_regions || []).length} вилоят`
+          : '';
+        document.getElementById('status').textContent =
+          `Сохранено рейсов: ${saved}${extra} · в окне ${horizon} дн.: ${events.length}`;
+      } catch (e) {
+        document.getElementById('status').textContent = 'Ошибка: ' + e.message;
+      } finally {
+        btn.disabled = false;
+        try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+      }
+    }
+
+    function details(i) {
+      const e = allEvents[i];
+      if (!e) return;
+      const stops = (e.stops || []);
+      const stopHtml = stops.length
+        ? `<ol class="stops">${stops.map((s) => {
+            const pct = s.balance_pct != null ? `остаток ${s.balance_pct}%` : '';
+            const src = s.forecast_source === 'ml'
+              ? (s.visit_by ? `ML: выезд до ${s.visit_by.slice(5, 16)}` : 'ML')
+              : 'по порогу остатка';
+            const cap = s.capacity_limited ? ' · спрос больше 400 млн (макс. загрузка)' : '';
+            return `<li>${s.name || s.terminal_id} · ${pct} · ${src} · ${moneyMln(s.refill_amount)}${cap}</li>`;
+          }).join('')}</ol>`
+        : '—';
+      document.getElementById('dialog').innerHTML = `
+        <div class="kv"><b>Маршрут</b><span>${e.label || e.address || '—'}</span></div>
+        <div class="kv"><b>Вилоят</b><span>${e.region || 'Не указан'}</span></div>
+        <div class="kv"><b>Дата выезда</b><span>${e.planned_date || eventDate(e)}</span></div>
+        <div class="kv"><b>Филиал</b><span>${e.terminal_id || '—'} ${e.branch_address ? '· ' + e.branch_address : ''}</span></div>
+        <div class="kv"><b>Время в пути</b><span>${e.est_time_min != null ? e.est_time_min + ' мин' : '—'}</span></div>
+        <div class="kv"><b>Дистанция</b><span>${e.distance_km != null ? e.distance_km + ' км' : '—'}</span></div>
+        <div class="kv"><b>Довезти</b><span>${moneyMln(e.recommended_refill)}</span></div>
+        <div class="kv"><b>Приоритет</b><span>${e.priority || '—'}</span></div>
+        ${e.late ? `<div class="kv"><b>Внимание</b><span style="color:#a50e0e">Дата рейса позже срока визита (${e.deadline}) — нужна ещё одна машина</span></div>` : ''}
+        <div class="kv"><b>Остановки (${stops.length})</b><span>${stopHtml}</span></div>
+        <p style="margin-top:15px"><a href="/dashboard/map.html?trip=${encodeURIComponent(e.id || '')}" target="_self" style="color:#6f42c1;font-weight:700">Открыть карту</a></p>`;
+      document.getElementById('modal').classList.add('open');
+    }
+
+    window.closeModal = closeModal;
+    window.selectDay = selectDay;
+    window.changeMonth = changeMonth;
+    window.today = today;
+    window.setHorizon = setHorizon;
+    window.rebuildPlan = rebuildPlan;
+    window.details = details;
+
+    loadCalendar();
+  </script>
+</body>
+</html>

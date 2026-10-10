@@ -1,0 +1,17 @@
+# Python кэш
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Виртуальные окружения
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# Генерируемые данные и модели аналитики (python -m api.analytics.build)
+data/

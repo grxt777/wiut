@@ -1,0 +1,26 @@
+ATM Cash-Out Prediction — Model Report
+==================================================
+Trained at:   2026-06-15T12:11:55.024075+00:00
+Horizon:      24h (12 steps)
+Cash-out thr: 20% | Clf threshold: 0.35
+Train end:    2024-09-30
+Val end:      2024-11-30
+Reg best iter:494
+Clf best iter:422
+
+- Validation -
+  Regression  MAE:             28,805,372 сум
+  Regression  MAPE(cap):             7.20%
+  Regression  MAPE(low bal):        18.67%
+  Classifier  ROC-AUC:       0.9868
+  Classifier  AUC-PR:        0.9216
+
+- Test -
+  Regression  MAPE(cap):             7.38%
+  Regression  MAPE(low bal):        21.19%
+  Regression  ±20%:                  90.2%
+  Classifier  ROC-AUC:       0.9818
+
+- Walk-forward (monthly test) -
+  2024-11: n=495, MAPE=6.81%, ±20%=92.7%, AUC=0.9884
+  2024-12: n=15506, MAPE=7.4%, ±20%=90.1%, AUC=0.9816

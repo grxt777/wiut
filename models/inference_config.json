@@ -1,0 +1,8 @@
+{
+  "cashout_threshold": 0.35,
+  "high_risk_threshold": 0.65,
+  "inference_history_steps": 96,
+  "low_balance_train_pct": 0.3,
+  "use_low_balance_model": true,
+  "use_atm_id_enc": false
+}

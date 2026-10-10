@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мониторинг и прогноз — Cash Flow AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/dashboard/css/ui.css?v=1">
+<style>
+:root {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --line: #e5eaf3;
+  --text: #111827;
+  --muted: #667085;
+  --faint: #98a2b3;
+  --brand: #2563eb;
+  --brand-soft: #eef4ff;
+  --ok: #16a34a;
+  --ok-soft: #e8f7ee;
+  --warn: #d97706;
+  --warn-soft: #fdf3e2;
+  --crit: #dc2626;
+  --crit-soft: #fdecec;
+  --info: #7c3aed;
+  --info-soft: #f3eefe;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06);
+  --shadow-md: 0 12px 28px rgba(16, 24, 40, .08);
+  --radius: 18px;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; overflow-x: hidden; }
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, .10), transparent 30%),
+    linear-gradient(180deg, #fbfdff 0%, var(--bg) 42%, #eef3fb 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+
+/* ── Header (как во внутренних страницах платформы) ── */
+header {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(255, 255, 255, .86); border-bottom: 1px solid var(--line);
+  padding: 14px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  backdrop-filter: blur(18px); box-shadow: var(--shadow);
+}
+header h1 { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+header .badge {
+  background: linear-gradient(135deg, var(--brand), #60a5fa); color: #fff; border-radius: 999px;
+  padding: 4px 11px; font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(37, 99, 235, .22);
+}
+header .spacer { flex: 1; }
+header h1, header .badge { white-space: nowrap; }
+@media (max-width: 1200px) { header .badge { display: none; } }
+.icon-inline { width: 15px; height: 15px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
+.dot.off { background: var(--crit); }
+.icon-btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px;
+  width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer;
+}
+
+main { max-width: 1440px; margin: 0 auto; padding: 22px 28px 60px; }
+
+/* ── KPI ── */
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi {
+  background: rgba(255, 255, 255, .92); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow-md); min-width: 0;
+}
+.kpi .label { font-size: 12px; color: var(--muted); }
+.kpi .value { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; }
+.kpi .sub { font-size: 12px; color: var(--faint); margin-top: 2px; }
+.kpi.crit .value { color: var(--crit); }
+.kpi.warn .value { color: var(--warn); }
+.kpi.good .value { color: var(--brand); }
+
+/* ── Toolbar ── */
+.panel {
+  background: rgba(255, 255, 255, .92); border: 1px solid var(--line); border-radius: 24px;
+  box-shadow: var(--shadow-md); overflow: hidden; backdrop-filter: blur(20px);
+}
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+}
+.seg { display: inline-flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
+.seg button {
+  display: inline-flex; align-items: center; height: 30px;
+  border: 0; background: transparent; padding: 0 12px; border-radius: 9px; cursor: pointer;
+  color: var(--muted); font-size: 12.5px; font-weight: 700; white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg .cnt { font-weight: 500; color: var(--faint); margin-left: 4px; }
+.search {
+  flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); border-radius: 11px; padding: 0 12px; background: var(--surface-2);
+}
+.search input { border: 0; outline: 0; background: transparent; padding: 9px 0; width: 100%; }
+select.sel {
+  border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; background: var(--surface-2);
+}
+
+/* ── ATM table ── */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th {
+  text-align: left; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--faint); padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+  white-space: nowrap;
+}
+.tbl td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tbl tbody tr { cursor: pointer; transition: background .12s; }
+.tbl tbody tr:hover { background: var(--surface-2); }
+.tbl tbody tr.sel { background: var(--brand-soft); }
+.atm-id { font-weight: 800; font-size: 15px; letter-spacing: -.01em; display: flex; align-items: center; gap: 7px; }
+.addr { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted);
+}
+.score {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 46px;
+  padding: 2px 7px; border-radius: 7px; font-weight: 800; font-size: 12.5px;
+  background: var(--info-soft); color: var(--info);
+}
+
+/* Cassette bars */
+.cass { display: flex; gap: 6px; align-items: flex-end; }
+.cbar { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 34px; }
+.cbar .tube {
+  width: 14px; height: 34px; border-radius: 4px; background: var(--surface-2);
+  border: 1px solid var(--line); position: relative; overflow: hidden;
+}
+.cbar .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ok); }
+.cbar.low .fill { background: var(--warn); }
+.cbar.empty .tube { border-color: var(--crit); background: var(--crit-soft); }
+.cbar .cap { font-size: 10px; color: var(--faint); font-weight: 700; }
+.cbar .n { font-size: 10.5px; font-family: var(--mono); color: var(--muted); }
+.cbar.empty .n { color: var(--crit); font-weight: 700; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  font-weight: 700; font-size: 12.5px; white-space: nowrap;
+}
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.pill.mute { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.empty-state { padding: 50px; text-align: center; color: var(--muted); }
+
+/* ── Drawer ── */
+.scrim { position: fixed; inset: 0; background: rgba(10, 15, 12, .35); z-index: 40; display: none; }
+.scrim.open { display: block; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(860px, 100vw); z-index: 50;
+  background: var(--bg); border-left: 1px solid var(--line); transform: translateX(100%);
+  transition: transform .22s ease, visibility 0s linear .22s; display: flex; flex-direction: column; visibility: hidden;
+}
+.drawer.open { transform: none; visibility: visible; transition: transform .22s ease; }
+.dr-head { padding: 18px 24px 0; background: var(--surface); border-bottom: 1px solid var(--line); }
+.dr-title { display: flex; align-items: flex-start; gap: 12px; }
+.dr-title h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+.dr-tabs { display: flex; gap: 4px; margin-top: 14px; }
+.dr-tabs button {
+  border: 0; background: transparent; padding: 10px 14px; cursor: pointer; font-weight: 700;
+  color: var(--muted); border-bottom: 2px solid transparent;
+}
+.dr-tabs button.on { color: var(--brand); border-bottom-color: var(--brand); }
+.dr-body { overflow-y: auto; padding: 20px 24px 40px; flex: 1; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px;
+}
+.card h3 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.cass-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.cc { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--surface-2); }
+.cc .d { font-weight: 800; }
+.cc .bar { height: 6px; border-radius: 3px; background: var(--line); margin: 8px 0 6px; overflow: hidden; }
+.cc .bar i { display: block; height: 100%; background: var(--ok); }
+.cc.low .bar i { background: var(--warn); }
+.cc.empty { border-color: var(--crit); }
+.cc.empty .d { color: var(--crit); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 600; text-align: right; }
+.rec-hero { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.big { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }
+#rateIn { width: 70px; border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--surface-2); }
+.mini-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-tbl th { text-align: right; color: var(--faint); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.mini-tbl th:first-child, .mini-tbl td:first-child { text-align: left; }
+.mini-tbl td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.driver { display: grid; grid-template-columns: 200px 1fr 54px; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+.driver .track { height: 8px; background: var(--surface-2); border-radius: 4px; position: relative; overflow: hidden; }
+.driver .track i { position: absolute; top: 0; bottom: 0; background: var(--brand); border-radius: 4px; }
+.driver .track i.neg { background: var(--warn); }
+.note { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
+.chart-wrap { position: relative; height: 260px; }
+.pager { display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; }
+.pager button {
+  height: 32px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px;
+  padding: 0 12px; cursor: pointer; font-size: 12.5px; font-weight: 700;
+}
+.pager button:hover:not(:disabled) { border-color: var(--faint); }
+.pager button:disabled { opacity: .4; cursor: default; }
+.bills { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.loading { padding: 40px; text-align: center; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .col-eq, .col-load { display: none; }
+}
+@media (max-width: 760px) {
+  header { padding: 10px 16px; gap: 10px; }
+  .app-clock { display: none; }
+  .toolbar { padding: 12px; }
+  .toolbar > * { max-width: 100%; }
+  .seg { overflow-x: auto; scrollbar-width: none; }
+  .search, select.sel { flex: 1 1 100%; }
+  main { padding: 16px 16px 40px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kpi .value { font-size: 20px; }
+  .col-loc, .col-cass { display: none; }
+  .tbl td, .tbl th { padding: 10px; }
+  .grid2, .cass-cards { grid-template-columns: 1fr 1fr; }
+  .dr-head, .dr-body { padding-left: 16px; padding-right: 16px; }
+  .driver { grid-template-columns: 1fr 80px 46px; }
+  .tx-addr { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Мониторинг и прогноз</h1>
+  <span class="badge">Ipak Yo'li Bank · Ташкент</span>
+  <div class="spacer"></div>
+  <nav data-app-nav></nav>
+  <script src="/dashboard/js/app-nav.js?v=1"></script>
+  <span class="app-clock" title="Синтетические данные"><i data-lucide="clock-3"></i>Данные на <b id="now">—</b></span>
+</header>
+
+<main>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <div class="seg" id="tabs"></div>
+      <div class="seg" id="conn">
+        <button data-v="all" class="on">Все</button>
+        <button data-v="online">На связи</button>
+        <button data-v="offline">Нет связи</button>
+      </div>
+      <label class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="faint"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" placeholder="ID, серийный номер, адрес, тип локации" autocomplete="off">
+      </label>
+      <select class="sel" id="sort" aria-label="Сортировка">
+        <option value="hours_to_empty:asc">Скоро опустеют</option>
+        <option value="balance:asc">Остаток ↑</option>
+        <option value="balance:desc">Остаток ↓</option>
+        <option value="geo_score:desc">Гео-скоринг ↓</option>
+        <option value="load_value:desc">Сумма загрузки ↓</option>
+        <option value="atm_id:asc">ID</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Банкомат</th>
+            <th class="col-loc">Локация</th>
+            <th class="col-cass">Кассеты</th>
+            <th>Остаток</th>
+            <th>Прогноз</th>
+            <th class="col-load">Рекомендация</th>
+            <th class="col-eq">Оборудование</th>
+          </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="7" class="loading">Загрузка…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="dr-head">
+    <div class="dr-title">
+      <div style="flex:1;min-width:0">
+        <div class="muted" id="drSub" style="font-size:12.5px"></div>
+        <h2 id="drTitle">—</h2>
+        <div id="drTags" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+      </div>
+      <button class="icon-btn" id="drClose" aria-label="Закрыть">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <nav class="dr-tabs" id="drTabs">
+      <button data-t="overview" class="on">Обзор</button>
+      <button data-t="tx">Транзакции</button>
+      <button data-t="model">Модель</button>
+    </nav>
+  </div>
+  <div class="dr-body" id="drBody"></div>
+</aside>
+
+<script>
+const API = location.origin + "/api/analytics";
+let NOW = null;
+const state = { tab: "active", conn: "all", q: "", sort: "hours_to_empty", order: "asc",
+                atm: null, drTab: "overview", cycle: 72, rate: null, txPage: 1, txStatus: "all", txQ: "" };
+let chart = null;
+let modelCache = null;
+
+// ── Форматирование ──
+const nf = new Intl.NumberFormat("ru-RU");
+const mln = v => v == null ? "—" : (v / 1e6).toLocaleString("ru-RU", { maximumFractionDigits: v >= 1e9 ? 0 : 1 }) + " млн";
+const bln = v => (v / 1e9).toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + " млрд";
+const uzs = v => nf.format(v) + " сум";
+const denomLabel = d => d >= 1000 ? (d / 1000) + "k" : d;
+const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+function dt(s, withDay = true) {
+  if (!s) return "—";
+  const d = new Date(s.replace(" ", "T"));
+  const p = n => String(n).padStart(2, "0");
+  const t = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  return withDay ? `${WD[d.getDay()]} ${p(d.getDate())}.${p(d.getMonth() + 1)} ${t}` : t;
+}
+function dur(h) {
+  if (h == null) return "> 7 дней";
+  if (h < 24) return `~${h} ч`;
+  const d = Math.floor(h / 24), r = h % 24;
+  return r ? `~${d} д ${r} ч` : `~${d} д`;
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} ${url}`);
+  return r.json();
+}
+
+// ── KPI ──
+async function loadSummary() {
+  const s = await getJSON(`${API}/summary`);
+  NOW = s.now;
+  document.getElementById("now").textContent = dt(s.now);
+  const noCashPct = s.tx_7d ? (s.no_cash_tx_7d / s.tx_7d * 100).toFixed(1) : "0";
+  const items = [
+    { label: "На связи", value: `${s.atms_online} / ${s.atms_total}`, sub: "банкоматов" },
+    { label: "Наличных в сети", value: bln(s.cash_in_network), sub: "сум, все кассеты" },
+    { label: "Опустеют за 24 ч", value: s.empty_within_24h, sub: "по прогнозу модели", cls: s.empty_within_24h ? "crit" : "" },
+    { label: "Выезды сегодня", value: s.visits_today, sub: "срочные и до конца дня", cls: s.visits_today ? "warn" : "" },
+    { label: "Отказы «нет наличных»", value: nf.format(s.no_cash_tx_7d), sub: `${noCashPct}% транзакций за 7 дней`, cls: "crit" },
+    { label: "Можно высвободить", value: bln(s.freed_cash), sub: `против стандартной загрузки, уровень сервиса P${Math.round(s.service_level * 100)}`, cls: "good" },
+  ];
+  document.getElementById("kpis").innerHTML = items.map(k =>
+    `<div class="kpi ${k.cls || ""}"><div class="label">${k.label}</div><div class="value num">${k.value}</div><div class="sub">${k.sub}</div></div>`
+  ).join("");
+}
+
+// ── Список ──
+function cassetteBars(cs) {
+  return `<div class="cass">${cs.map(c => {
+    const cls = c.count === 0 ? "empty" : c.fill_pct < 15 ? "low" : "";
+    return `<div class="cbar ${cls}" title="${denomLabel(c.denom)}: ${nf.format(c.count)} купюр · ${mln(c.value)}">
+      <div class="tube"><div class="fill" style="height:${Math.min(c.fill_pct, 100)}%"></div></div>
+      <span class="n">${nf.format(c.count)}</span><span class="cap">${denomLabel(c.denom)}</span></div>`;
+  }).join("")}</div>`;
+}
+
+function forecastPill(f, atm) {
+  if (atm.lifecycle === "maintenance") return `<span class="pill mute">На обслуживании</span>`;
+  if (!f) return `<span class="pill mute">Нет прогноза</span>`;
+  const h = f.hours_to_empty;
+  const cls = h == null ? "ok" : h <= 12 ? "crit" : h <= 36 ? "warn" : "ok";
+  return `<span class="pill ${cls}">${dur(h)}</span><div class="faint" style="font-size:12px;margin-top:4px">${h == null ? "запаса хватит на неделю" : "до " + dt(f.empty_at)}</div>`;
+}
+
+function recCell(f, atm) {
+  if (!f || atm.lifecycle === "maintenance") return `<span class="faint">—</span>`;
+  const u = { urgent: ["crit", "Срочно"], today: ["warn", "Сегодня"], planned: ["info", "Плановый"], ok: ["ok", "Не нужно"] }[f.urgency];
+  const when = f.visit_by ? (f.visit_by === NOW ? "выехать сейчас" : "до " + dt(f.visit_by)) : "в ближайшие 7 дней не нужно";
+  return `<span class="pill ${u[0]}">${u[1]}</span><div style="font-size:12.5px;margin-top:4px">${when}</div>
+    <div class="faint num" style="font-size:12px">довезти ${mln(f.topup_value)} → станет ${mln(f.load_value)}${f.capacity_limited ? ` <span style="color:var(--crit)" title="Спрос за цикл больше 400 млн — в банкомат больше не помещается">· макс. 400 млн</span>` : ""}</div>`;
+}
+
+async function loadList() {
+  const p = new URLSearchParams({ tab: state.tab, conn: state.conn, q: state.q, sort: state.sort, order: state.order });
+  const d = await getJSON(`${API}/atms?${p}`);
+  const labels = { active: "В работе", pilot: "Пилот", maintenance: "Обслуживание", all: "Все" };
+  document.getElementById("tabs").innerHTML = Object.keys(labels).map(k =>
+    `<button data-v="${k}" class="${k === state.tab ? "on" : ""}">${labels[k]}<span class="cnt">${d.tabs[k]}</span></button>`
+  ).join("");
+  const tb = document.getElementById("rows");
+  if (!d.items.length) { tb.innerHTML = `<tr><td colspan="7" class="empty-state">Ничего не найдено</td></tr>`; return; }
+  tb.innerHTML = d.items.map(a => `
+    <tr data-id="${a.atm_id}" class="${state.atm === a.atm_id ? "sel" : ""}">
+      <td>
+        <div class="atm-id"><span class="dot ${a.online ? "" : "off"}" title="${a.online ? "На связи" : "Нет связи"}"></span>${a.atm_id}</div>
+        <div class="mono faint">${esc(a.serial)}</div>
+      </td>
+      <td class="col-loc">
+        <div class="addr" title="${esc(a.address)}">${esc(a.address)}</div>
+        <div style="display:flex;gap:6px;margin-top:4px"><span class="tag">${esc(a.category_label)}</span><span class="score" title="Гео-скоринг локации, 0–10">${a.geo_score.toFixed(2)}</span></div>
+      </td>
+      <td class="col-cass">${cassetteBars(a.cassettes)}</td>
+      <td class="num" style="font-weight:700;white-space:nowrap">${mln(a.balance)}</td>
+      <td>${forecastPill(a.forecast, a)}</td>
+      <td class="col-load">${recCell(a.forecast, a)}</td>
+      <td class="col-eq"><div style="font-weight:600">${esc(a.vendor)} ${esc(a.model)}</div><div class="faint">${esc(a.variant)}</div></td>
+    </tr>`).join("");
+}
+
+// ── Карточка банкомата ──
+function openDrawer(id) {
+  try { const u = new URL(location.href); u.searchParams.set("atm", id); history.replaceState(null, "", u); } catch (_) {}
+  state.atm = id; state.drTab = "overview"; state.txPage = 1; state.txStatus = "all"; state.txQ = "";
+  document.querySelectorAll("#rows tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.id === id));
+  document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawer").setAttribute("aria-hidden", "false");
+  document.getElementById("scrim").classList.add("open");
+  setDrTab("overview");
+}
+function closeDrawer() {
+  try { const u = new URL(location.href); u.searchParams.delete("atm"); u.searchParams.delete("view"); history.replaceState(null, "", u); } catch (_) {}
+  state.atm = null;
+  document.getElementById("drawer").classList.remove("open");
+  document.getElementById("drawer").setAttribute("aria-hidden", "true");
+  document.getElementById("scrim").classList.remove("open");
+  document.querySelectorAll("#rows tr.sel").forEach(tr => tr.classList.remove("sel"));
+}
+async function ensureHeader() {
+  if (document.getElementById("drTitle").dataset.atm === state.atm) return;
+  const d = await getJSON(`${API}/atms/${state.atm}`);
+  header(d.atm);
+  state.atmAddress = d.atm.address;
+}
+function setDrTab(t) {
+  if (t !== "overview") ensureHeader();
+  state.drTab = t;
+  document.querySelectorAll("#drTabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  ({ overview: renderOverview, tx: renderTx, model: renderModel })[t]();
+}
+
+function header(a) {
+  document.getElementById("drSub").textContent = `${a.serial} · ${a.vendor} ${a.model} · ${a.variant}`;
+  document.getElementById("drTitle").textContent = `Банкомат ${a.atm_id}`;
+  document.getElementById("drTitle").dataset.atm = a.atm_id;
+  document.getElementById("drTags").innerHTML = [
+    `<span class="pill ${a.online ? "ok" : "crit"}"><span class="dot ${a.online ? "" : "off"}"></span>${a.online ? "На связи" : "Нет связи с " + dt(a.last_seen)}</span>`,
+    `<span class="pill mute">${esc(a.lifecycle_label)}</span>`,
+    `<span class="pill info">${esc(a.category_label)} · ${a.geo_score.toFixed(2)}</span>`,
+  ].join("");
+}
+
+async function renderOverview() {
+  const body = document.getElementById("drBody");
+  body.innerHTML = `<div class="loading">Считаем прогноз…</div>`;
+  const p = new URLSearchParams({ cycle_h: state.cycle });
+  if (state.rate != null) p.set("rate_pct", state.rate);
+  const atmId = state.atm;
+  const d = await getJSON(`${API}/atms/${atmId}?${p}`);
+  if (state.drTab !== "overview" || state.atm !== atmId) return;
+  const a = d.atm, r = d.recommendation;
+  header(a);
+  if (state.rate == null && r) state.rate = r.rate_pct;
+
+  const cass = a.cassettes.map((c, j) => {
+    const cls = c.count === 0 ? "empty" : c.fill_pct < 15 ? "low" : "";
+    return `<div class="cc ${cls}">
+      <div style="display:flex;justify-content:space-between"><span class="d">${nf.format(c.denom)}</span><span class="faint">К${c.slot}</span></div>
+      <div class="bar"><i style="width:${Math.min(c.fill_pct, 100)}%"></i></div>
+      <div class="num" style="font-weight:700">${nf.format(c.count)} <span class="faint" style="font-weight:500">/ 2 500</span></div>
+      <div class="faint num" style="font-size:12px">${mln(c.value)} · ${(a.denom_shares[j] * 100).toFixed(0)}% выдачи</div>
+    </div>`;
+  }).join("");
+
+  let recHtml = `<div class="note">Банкомат на обслуживании — прогноз не используется для планирования.</div>`;
+  if (r && a.lifecycle !== "maintenance") {
+    const u = { urgent: ["crit", "Срочный выезд"], today: ["warn", "Выезд сегодня"], planned: ["info", "Плановый выезд"], ok: ["ok", "Пополнение не требуется"] }[r.urgency];
+    const fce = r.first_cassette_empty;
+    const sl = Math.round(r.service_level * 100);
+    const rows = a.cassettes.map((c, j) => `<tr>
+        <td>${nf.format(c.denom)}</td>
+        <td class="num">${nf.format(a.standard_load_bills[j])}</td>
+        <td class="num" style="font-weight:700">${nf.format(r.load.bills[j])}</td>
+        <td class="num">${mln(r.load.bills[j] * c.denom)}</td></tr>`).join("");
+    recHtml = `
+      <div class="rec-hero">
+        <span class="pill ${u[0]}" style="font-size:14px;padding:6px 14px">${u[1]}</span>
+        ${r.visit_by ? (r.visit_by === NOW ? `<span class="big">выехать сейчас</span><span class="muted">запаса не хватит до следующего окна инкассации (Пн–Сб 09:00–18:00)</span>` : `<span class="big">до ${dt(r.visit_by)}</span>`) : `<span class="muted">запаса хватает на 7 дней</span>`}
+      </div>
+      <dl class="kv">
+        <dt>Деньги закончатся</dt><dd>${r.empty_at ? dt(r.empty_at) : "не в ближайшие 7 дней"}</dd>
+        <dt>Окно P10–P90</dt><dd>${r.empty_window.earliest ? dt(r.empty_window.earliest) + " — " + (r.empty_window.latest ? dt(r.empty_window.latest) : "> 7 дней") : "—"}</dd>
+        <dt>Первой опустеет кассета</dt><dd>${fce ? nf.format(fce.denom) + (fce.already_empty ? " — уже пуста" : " · " + dt(fce.at)) : "—"}</dd>
+        <dt>Спрос за 24 ч</dt><dd class="num">${mln(r.demand_24h.expected)} <span class="faint">(${mln(r.demand_24h.p10)}–${mln(r.demand_24h.p90)})</span></dd>
+        <dt>К визиту останется</dt><dd class="num">~${mln(r.balance_at_visit)}</dd>
+        <dt>Довезти</dt><dd class="num" style="font-weight:800">${mln(r.topup_value)} <span class="faint">→ в банкомате станет ${mln(r.load.value)} из 400 млн</span></dd>
+      </dl>
+      <div style="height:14px"></div>
+      <div class="controls">
+        <span class="muted">Следующий визит через</span>
+        <div class="seg" id="cycleSeg">${[24, 48, 72, 96, 168].map(h => `<button data-v="${h}" class="${h === state.cycle ? "on" : ""}">${h / 24} д</button>`).join("")}</div>
+        <span class="muted">ставка, % год.</span><input id="rateIn" type="number" step="0.5" min="0" max="60" value="${state.rate}">
+      </div>
+      <table class="mini-tbl">
+        <thead><tr><th>Номинал</th><th>Стандарт банка, куп.</th><th>В банкомате после визита, куп.</th><th>Сумма</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td style="font-weight:700">Итого</td><td class="num">${mln(r.standard_load_value)}</td><td class="num" style="font-weight:800">${mln(r.load.value)}</td><td></td></tr></tfoot>
+      </table>
+      <div class="grid2" style="margin-top:12px">
+        <div class="note">Спрос за цикл ${r.cycle_h / 24} д: ожидаемо <b>${mln(r.demand_cycle_expected)}</b>, P${sl} — <b>${mln(r.demand_cycle_safe)}</b>. Загрузка покрывает P${sl} + резерв: загрузки не хватает до следующего визита не более чем в ~${100 - sl}% циклов.</div>
+        <div class="note">Высвобождается <b>${mln(r.freed_cash)}</b> против стандартной загрузки, это <b>${uzs(r.cost_saved_per_cycle)}</b> стоимости денег за цикл при ставке ${r.rate_pct}% <span class="faint">(допущение)</span>.</div>
+      </div>
+      ${r.capacity_limited ? `<div class="note" style="margin-top:12px;border-color:var(--crit);color:var(--crit);background:var(--crit-soft)">Спрос за ${r.cycle_h / 24} д больше, чем помещается в банкомат (не более 400 млн, загрузка ${mln(r.load.value)}). Полной загрузки хватит примерно на <b>${r.covers_h} ч</b> — запланируйте следующий визит раньше или выберите цикл короче.</div>` : ""}`;
+  }
+
+  const maxImp = Math.max(...d.explanation.map(e => Math.abs(e.impact_pct)), 1);
+  const drivers = d.explanation.map(e => `<div class="driver">
+      <span>${esc(e.label)}</span>
+      <span class="track"><i class="${e.impact_pct < 0 ? "neg" : ""}" style="left:0;width:${Math.abs(e.impact_pct) / maxImp * 100}%"></i></span>
+      <span class="num" style="text-align:right;font-weight:700">${e.impact_pct > 0 ? "+" : ""}${e.impact_pct}%</span></div>`).join("");
+
+  const incs = d.incassations.map(i => `<tr><td>${dt(i.ts)}</td><td>${i.kind === "emergency" ? '<span class="pill crit">аварийная</span>' : '<span class="pill mute">по графику</span>'}</td>
+      <td class="num">${mln(i.loaded_amount)}</td><td class="num faint">${mln(i.returned_amount)}</td></tr>`).join("");
+
+  body.innerHTML = `
+    <div class="card"><h3>Кассеты · остаток ${mln(a.balance)}</h3><div class="cass-cards">${cass}</div></div>
+    <div class="card"><h3>Остаток: 7 дней факта и 7 дней прогноза</h3><div class="chart-wrap"><canvas id="balChart"></canvas></div>
+      <div class="faint" style="font-size:12px;margin-top:6px">Полоса — интервал P10–P90 (конформная калибровка на отдельном окне, не участвовавшем в обучении). Прогноз без учёта будущей инкассации.</div></div>
+    <div class="card"><h3>Рекомендация по инкассации</h3>${recHtml}</div>
+    <div class="grid2">
+      <div class="card"><h3>Почему такой прогноз</h3>${drivers || '<div class="faint">—</div>'}
+        <div class="faint" style="font-size:12px;margin-top:8px">Вклад признаков в спрос ближайших 24 ч (SHAP, XGBoost).</div></div>
+      <div class="card"><h3>Последние инкассации</h3>
+        <table class="mini-tbl"><thead><tr><th>Время</th><th>Тип</th><th>Загружено</th><th>Возврат</th></tr></thead><tbody>${incs}</tbody></table></div>
+    </div>
+    <div class="card"><h3>Локация и гео-скоринг</h3>
+      <dl class="kv"><dt>Место установки</dt><dd>${esc(a.address)}</dd>
+      <dt>Район (по координатам)</dt><dd>${esc(a.district)}</dd>
+      <dt>Координаты</dt><dd class="mono">${a.lat.toFixed(5)}, ${a.lon.toFixed(5)}</dd>
+      <dt>Филиал по реестру ЦБ</dt><dd style="font-weight:500">${esc(a.registry_address)}</dd>
+      <dt>Платёжные системы</dt><dd style="font-weight:500">${esc(a.payment_systems)}</dd>
+      <dt>Устройств на этой точке</dt><dd>${a.devices_at_site}</dd>
+      <dt>Тип локации</dt><dd>${esc(a.category_label)}</dd>
+      <dt>Гео-скоринг</dt><dd>${a.geo_score.toFixed(2)} / 10</dd>
+      <dt>Банкоматов других банков в 500 м</dt><dd>${a.competitors_500m}</dd></dl>
+      <div style="height:12px"></div>
+      ${(() => { const items = a.geo_breakdown || []; const mx = Math.max(...items.map(g => Math.abs(g.points || 0)), 0.01);
+        return items.map(g => { const neg = (g.points || 0) < 0;
+          return `<div class="driver"><span style="${neg ? "color:var(--crit);font-weight:600" : ""}">${esc(g.label)}${neg && g.count ? ` (${g.count})` : ""}</span><span class="track"><i style="left:0;width:${Math.abs(g.points || 0) / mx * 100}%;${neg ? "background:var(--crit)" : ""}"></i></span><span class="num" style="text-align:right;${neg ? "color:var(--crit)" : ""}">${neg ? "−" : "+"}${Math.abs(g.points || 0).toFixed(2)}</span></div>`; }).join("") || '<div class="faint">Рядом нет мест скопления людей из OSM</div>'; })()}
+      <div class="note" style="margin-top:10px">Скоринг считается по открытым данным: места скопления людей OpenStreetMap (метро, рынки, ТЦ, супермаркеты) повышают оценку с затуханием по расстоянию, банкоматы других банков из реестра ЦБ РУз слегка снижают — они делят тот же спрос. Веса — допущение, на пилоте калибруются по реальным снятиям.</div></div>`;
+
+  drawChart(d);
+  document.querySelectorAll("#cycleSeg button").forEach(b => b.onclick = () => { state.cycle = +b.dataset.v; renderOverview(); });
+  const rateIn = document.getElementById("rateIn");
+  if (rateIn) rateIn.onchange = () => { const v = parseFloat(rateIn.value); if (!isNaN(v)) { state.rate = v; renderOverview(); } };
+}
+
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function drawChart(d) {
+  if (chart) { chart.destroy(); chart = null; }
+  const r = d.recommendation;
+  const hist = d.history.map(h => ({ x: h.ts, y: h.balance / 1e6 }));
+  const ds = [{
+    label: "Факт", data: hist, borderColor: css("--text"), borderWidth: 1.6, pointRadius: 0, tension: .15,
+  }];
+  if (r) {
+    const bp = r.balance_path;
+    const pts = k => bp.ts.map((t, i) => ({ x: t, y: bp[k][i] / 1e6 }));
+    ds.push(
+      { label: "P90 спроса", data: pts("p10"), borderColor: "transparent", pointRadius: 0, fill: false },
+      { label: "Интервал P10–P90", data: pts("p90"), borderColor: "transparent", backgroundColor: css("--brand-soft"), pointRadius: 0, fill: "-1" },
+      { label: "Прогноз", data: pts("p50"), borderColor: css("--brand"), borderWidth: 2.2, borderDash: [5, 4], pointRadius: 0 },
+    );
+  }
+  const labels = [...new Set([...hist.map(p => p.x), ...(r ? r.balance_path.ts : [])])];
+  chart = new Chart(document.getElementById("balChart"), {
+    type: "line",
+    data: { labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false, parsing: { xAxisKey: "x", yAxisKey: "y" },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { color: css("--muted"), boxWidth: 12, filter: i => i.text !== "P90 спроса" } },
+        tooltip: { callbacks: { title: it => dt(it[0].label), label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)} млн` } },
+      },
+      scales: {
+        x: { ticks: { color: css("--faint"), maxTicksLimit: 8, callback: function (v) { const s = this.getLabelForValue(v); return s && s.endsWith("00:00:00") ? dt(s).slice(0, 8) : ""; } }, grid: { display: false } },
+        y: { ticks: { color: css("--faint"), callback: v => v + " млн" }, grid: { color: css("--line") }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+async function renderTx() {
+  const body = document.getElementById("drBody");
+  const p = new URLSearchParams({ page: state.txPage, page_size: 25, status: state.txStatus, q: state.txQ });
+  const atmId = state.atm;
+  const d = await getJSON(`${API}/atms/${atmId}/transactions?${p}`);
+  if (state.drTab !== "tx" || state.atm !== atmId) return;
+  const st = { ok: ["ok", "Выдано"], no_cash: ["crit", "Нет наличных"], declined: ["mute", "Отказ эмитента"] };
+  const bs = d.by_status;
+  const sum = k => bs[k] ? `${nf.format(bs[k].count)}` : "0";
+  const rows = d.items.map(t => `<tr>
+      <td class="num" style="white-space:nowrap">${dt(t.ts)}</td>
+      <td class="mono" style="white-space:nowrap">${esc(t.card_masked)}<div class="faint" style="font-size:11px">${esc(t.card_token)}</div></td>
+      <td class="num" style="font-weight:700;white-space:nowrap">${nf.format(t.amount)}</td>
+      <td><span class="pill ${st[t.status][0]}">${st[t.status][1]}</span></td>
+      <td class="bills">${t.status === "ok" ? [["10k", t.b10], ["50k", t.b50], ["100k", t.b100], ["200k", t.b200]].filter(x => x[1]).map(x => x[1] + "×" + x[0]).join(" ") : "—"}</td>
+      <td class="tx-addr faint" style="font-size:12px">${esc(t.atm_id)} · ${t.lat.toFixed(4)}, ${t.lon.toFixed(4)}</td>
+    </tr>`).join("");
+  body.innerHTML = `
+    <div class="card">
+      <div class="controls" style="margin-bottom:0">
+        <div class="seg" id="txSeg">
+          ${[["all", "Все"], ["ok", "Выдано"], ["no_cash", "Нет наличных"], ["declined", "Отказ эмитента"]].map(([v, l]) =>
+            `<button data-v="${v}" class="${v === state.txStatus ? "on" : ""}">${l}<span class="cnt">${v === "all" ? nf.format(Object.values(bs).reduce((s, x) => s + x.count, 0)) : sum(v)}</span></button>`).join("")}
+        </div>
+        <label class="search" style="max-width:260px"><input id="txQ" placeholder="Последние 4 цифры карты или токен" value="${esc(state.txQ)}"></label>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table class="tbl"><thead><tr><th>Время</th><th>Карта</th><th>Сумма, сум</th><th>Статус</th><th>Купюры</th><th class="tx-addr">Банкомат · локация</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="empty-state">Нет транзакций</td></tr>`}</tbody></table>
+    </div>
+    <div class="pager"><button id="prev" ${d.page <= 1 ? "disabled" : ""}>← Назад</button>
+      <span class="muted">Стр. ${d.page} из ${d.pages} · ${nf.format(d.total)} операций</span>
+      <button id="next" ${d.page >= d.pages ? "disabled" : ""}>Вперёд →</button></div>
+    <div class="note">Номера карт синтетические и хранятся только в маске (BIN + последние 4 цифры) с необратимым токеном. Полный номер не генерируется и не хранится. Адрес банкомата: ${esc(state.atmAddress || "")}</div>`;
+  document.querySelectorAll("#txSeg button").forEach(b => b.onclick = () => { state.txStatus = b.dataset.v; state.txPage = 1; renderTx(); });
+  document.getElementById("prev").onclick = () => { state.txPage--; renderTx(); };
+  document.getElementById("next").onclick = () => { state.txPage++; renderTx(); };
+  let tmr;
+  document.getElementById("txQ").oninput = e => { clearTimeout(tmr); tmr = setTimeout(() => { state.txQ = e.target.value.trim(); state.txPage = 1; renderTx().then(() => { const i = document.getElementById("txQ"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }); }, 300); };
+}
+
+function policyCard(m) {
+  const bt = m.load_policy_backtest;
+  if (!bt || !bt.policies) return "";
+  const sl = Math.round((m.service_level || 0.9) * 100);
+  const names = { ml_service_level: `ML, уровень сервиса P${sl} (используется)`, ml_p90: "ML, граница P90", bank_standard: "Стандартная загрузка банка" };
+  const pct = v => v == null ? "—" : `${v.toFixed(2)}%`;
+  const rows = ["ml_service_level", "ml_p90", "bank_standard"].filter(k => bt.policies[k]).map(k => {
+    const p = bt.policies[k];
+    const hl = k === "ml_service_level" ? "font-weight:800;color:var(--brand)" : "";
+    return `<tr><td style="${hl}">${names[k]}</td><td class="num" style="${hl}">${mln(p.avg_load_uzs)}</td><td class="num" style="${hl}">${pct(p.cycle_shortfall_pct)}</td><td class="num" style="${hl}">${pct(p.cashout_before_visit_pct)}</td></tr>`;
+  }).join("");
+  return `<div class="card"><h3>Проверка политики загрузки на тесте (цикл ${bt.cycle_h / 24} д)</h3>
+      <table class="mini-tbl"><thead><tr><th>Политика</th><th>Средняя загрузка</th><th>Не хватило до конца цикла</th><th>Деньги кончились до визита</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div class="faint" style="font-size:12px;margin-top:8px">${nf.format(bt.n_paths)} прогнозов с разных моментов. Срок визита в проверке не сдвигается к рабочему окну инкассации — реальный выезд только раньше, поэтому последняя колонка — оценка сверху.</div></div>`;
+}
+
+async function renderModel() {
+  const body = document.getElementById("drBody");
+  const m = modelCache || (modelCache = await getJSON(`${API}/model`));
+  if (state.drTab !== "model") return;
+  const w = m.wape_pct;
+  const row = (k, l) => `<tr><td>${l}</td>${["24h", "72h", "7d"].map(h => `<td class="num" style="${k === "model" ? "font-weight:800;color:var(--brand)" : ""}">${w[h][k].toFixed(1)}%</td>`).join("")}</tr>`;
+  const imp = m.feature_importance.map(f => `<div class="driver"><span>${esc(f.label)}</span><span class="track"><i style="left:0;width:${f.share / m.feature_importance[0].share * 100}%"></i></span><span class="num" style="text-align:right">${f.share.toFixed(1)}%</span></div>`).join("");
+  body.innerHTML = `
+    <div class="card"><h3>Ошибка прогноза накопленного спроса (WAPE, тест)</h3>
+      <table class="mini-tbl"><thead><tr><th>Метод</th><th>24 ч</th><th>72 ч</th><th>7 дней</th></tr></thead>
+      <tbody>${row("model", "XGBoost (наша модель)")}${row("bank_weekly_avg", "Метод банка: среднее за неделю")}${row("seasonal_naive", "Как неделю назад")}</tbody></table>
+      <div class="grid2" style="margin-top:12px">
+        <div class="note">Покрытие интервала P10–P90: <b>${m.interval_p10_p90_coverage_pct}%</b> (цель 80%). Прогнозов с разных моментов на тесте: ${nf.format(m.test_origins)}.</div>
+        <div class="note">Холодный старт (банкоматы с историей &lt; 28 дней), 24 ч: модель <b>${m.cold_start_24h ? m.cold_start_24h.model : "—"}%</b> против ${m.cold_start_24h ? m.cold_start_24h.seasonal_naive : "—"}% у наивного. Уровень прогноза подстраивается по факту последних 7 дней.</div>
+      </div></div>
+    ${policyCard(m)}
+    <div class="card"><h3>Разбиение по времени</h3>
+      <dl class="kv"><dt>Обучение</dt><dd>${m.split.train}</dd><dt>Валидация (ранняя остановка)</dt><dd>${m.split.validation}</dd>${m.split.calibration ? `<dt>Калибровка интервалов</dt><dd>${m.split.calibration}</dd>` : ""}<dt>Тест (не виден модели)</dt><dd>${m.split.test}</dd>
+      <dt>Строк обучения</dt><dd class="num">${nf.format(m.rows.train)}</dd><dt>Итераций бустинга</dt><dd>${m.best_iteration}</dd><dt>XGBoost</dt><dd>${m.xgboost_version}</dd></dl></div>
+    <div class="card"><h3>Важность признаков (gain)</h3>${imp}</div>
+    <div class="note">Данные синтетические: генератор <span class="mono">api/analytics/generator.py</span>, метод описан в README. Метрики показывают качество на этих данных и сравнение с бейзлайнами на одном и том же тесте. На реальных данных банка модель переобучается тем же пайплайном.</div>`;
+}
+
+// ── События ──
+document.getElementById("tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.tab = b.dataset.v; loadList(); });
+document.getElementById("conn").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.conn = b.dataset.v;
+  document.querySelectorAll("#conn button").forEach(x => x.classList.toggle("on", x === b));
+  loadList();
+});
+let qT;
+document.getElementById("q").addEventListener("input", e => { clearTimeout(qT); qT = setTimeout(() => { state.q = e.target.value; loadList(); }, 250); });
+document.getElementById("sort").addEventListener("change", e => { [state.sort, state.order] = e.target.value.split(":"); loadList(); });
+document.getElementById("rows").addEventListener("click", e => { const tr = e.target.closest("tr[data-id]"); if (tr) { state.atmAddress = tr.querySelector(".addr")?.textContent; openDrawer(tr.dataset.id); } });
+document.getElementById("drTabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setDrTab(b.dataset.t); });
+document.getElementById("drClose").onclick = closeDrawer;
+document.getElementById("scrim").onclick = closeDrawer;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+
+async function boot() {
+  for (let i = 0; i < 60; i++) {
+    try {
+      await loadSummary();
+      await loadList();
+      const qp = new URLSearchParams(location.search);
+      if (qp.get("atm")) {
+        openDrawer(qp.get("atm"));
+        if (["tx", "model"].includes(qp.get("view"))) setDrTab(qp.get("view"));
+      }
+      return;
+    }
+    catch (e) { await new Promise(r => setTimeout(r, 2000)); }
+  }
+  document.getElementById("rows").innerHTML = `<tr><td colspan="7" class="empty-state">Сервер недоступен</td></tr>`;
+}
+boot();
+if (window.lucide) lucide.createIcons();
+</script>
+</body>
+</html>
