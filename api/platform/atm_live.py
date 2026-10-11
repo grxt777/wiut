@@ -1,11 +1,9 @@
 """
-Реальные данные банкоматов от сборщика atm_monitor (пакет `atm_monitor/` в
-этом же проекте: опрашивает monitoring.btech.uz раз в час и пишет в SQLite
-`data/atm_monitor.db`; стартует вместе с сервером, см. atm_monitor/scheduler.py).
+Телеметрия банкоматов из SQLite `data/atm_monitor.db` (схема — atm_monitor/db.py):
+почасовой остаток, статус связи, кассеты, прогноз часов до опустошения.
 
-Этот модуль — read-only клиент той базы. Если данных ещё нет (сборщик не
-настроен или первый опрос не завершён) — функции возвращают пустой результат,
-дашборд продолжает работать на данных из реестра, просто без «живого» баланса.
+Этот модуль — read-only клиент той базы. Если данных нет, функции возвращают
+пустой результат и дашборд работает на данных реестра без «живого» баланса.
 """
 from __future__ import annotations
 
@@ -101,9 +99,9 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def find_nearest_tid(lat: Optional[float], lon: Optional[float], max_distance_m: float = 100) -> Optional[str]:
-    """Резерв на случай, когда terminal_id в реестре не совпадает с tid BTech
+    """Резерв на случай, когда terminal_id в реестре не совпадает с tid телеметрии
     (разные системы нумерации у разных сетей — WAY4/UzCard и т.п.), но это
-    физически тот же банкомат: реестр и BTech почти всегда указывают на один
+    физически тот же банкомат: реестр и телеметрия почти всегда указывают на один
     и тот же адрес с точностью в единицы-десятки метров.
 
     Матчит только координаты — при плотной застройке (несколько ATM в одном
@@ -145,7 +143,7 @@ _CASSETTE_FILTER_SQL = "c.cassette_type = 'BILLCASSETTE' AND c.nominal >= ?"
 
 
 def cassettes_by_tid(tid: str) -> List[Dict[str, Any]]:
-    """Реальные кассеты банкомата на момент последнего опроса (пусто, если ATM не в BTech).
+    """Кассеты банкомата на момент последнего снимка (пусто, если телеметрии нет).
 
     Список, а не словарь по номиналу: у части моделей встречается несколько
     кассет с одним и тем же номиналом (например, две по 200 000 — одна LOW,
@@ -210,36 +208,3 @@ def balance_history_by_tid(tid: str, days: int = 30) -> List[Dict[str, Any]]:
         }
         for r in rows
     ]
-
-
-def collector_status() -> Dict[str, Any]:
-    """Статус самого сборщика atm_monitor (последний прогон опроса BTech),
-    а не отдельного банкомата — для виджета на главной странице дашборда."""
-    rows = _query(
-        """
-        SELECT id, started_at, finished_at, status, atm_count, error_message
-        FROM poll_runs
-        ORDER BY id DESC
-        LIMIT 1
-        """
-    )
-    if not rows:
-        return {
-            "connected": False,
-            "last_poll_id": None,
-            "started_at": None,
-            "finished_at": None,
-            "status": None,
-            "atm_count": None,
-            "error": None,
-        }
-    r = rows[0]
-    return {
-        "connected": True,
-        "last_poll_id": r.get("id"),
-        "started_at": r.get("started_at"),
-        "finished_at": r.get("finished_at"),
-        "status": r.get("status"),
-        "atm_count": r.get("atm_count"),
-        "error": r.get("error_message"),
-    }

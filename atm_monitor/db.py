@@ -1,7 +1,5 @@
-"""SQLite-хранилище сборщика atm_monitor (файл data/atm_monitor.db).
-
-Раньше это была отдельная PostgreSQL; теперь — обычный файл, как и bank.db,
-поэтому всё запускается одной командой без серверов БД."""
+"""SQLite-хранилище телеметрии банкоматов (файл data/atm_monitor.db):
+снимки остатка, статуса связи, кассет и прогноза часов до опустошения."""
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -71,7 +69,7 @@ CREATE INDEX IF NOT EXISTS ix_turn_atm_time ON turnover_snapshots(atm_id, polled
 
 @contextmanager
 def connect(readonly: bool = False):
-    """Соединение с БД сборщика. Коммит при успехе, rollback при ошибке."""
+    """Соединение с БД телеметрии. Коммит при успехе, rollback при ошибке."""
     Path(settings.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(settings.DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row

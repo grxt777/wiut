@@ -4,7 +4,7 @@ ATM-платформа — FastAPI Backend
 
 Мониторинг банкоматов, прогноз спроса и инкассация в одном приложении.
 
-  Реестр и мониторинг (перенесено из проекта integratsya)
+  Реестр и мониторинг
     GET   /api/atms                         → список ATM из БД
     GET   /api/atms/stats                   → статистика по областям/филиалам
     GET   /api/atms/{terminal_id}           → детали ATM
@@ -40,8 +40,6 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-import atm_monitor.api as atm_monitor_api
-import atm_monitor.scheduler as atm_collector
 from api.analytics.config import SIM_NOW
 from api.analytics.routes import compat_router as analytics_compat_router, router as analytics_router
 from api.analytics.service import service as analytics_service
@@ -101,9 +99,7 @@ async def lifespan(app: FastAPI):
     # остатки, введённые вручную до перезапуска, — в прогноз аналитики
     attach_ml(list_atms(limit=5000), analytics_service)
     log.info("БД готова. ATM в базе: %d, филиалов: %d", count_atms(), count_branches())
-    atm_collector.start_background()   # реальный коннектор мониторинга; без учётных данных не стартует
     yield
-    atm_collector.stop_background()
     log.info("Сервер остановлен.")
 
 
@@ -123,7 +119,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(atm_monitor_api.router)
 app.include_router(analytics_router)
 app.include_router(analytics_compat_router)
 
@@ -151,11 +146,6 @@ async def health():
         "analytics_ready": analytics_service.ready,
         "modules": ["atm-monitor", "atm-analytics"],
     }
-
-
-@app.get("/api/atm-monitor/status", summary="Статус сборщика atm_monitor (последний опрос)")
-async def atm_monitor_status():
-    return atm_live.collector_status()
 
 @app.middleware("http")
 async def no_cache_dashboard(request: Request, call_next):
@@ -221,8 +211,8 @@ CASSETTE_MAX_COUNT = 2000  # физический потолок купюр на
 @app.get("/api/atms/{terminal_id}/cassettes", summary="Кассеты + рекомендация по загрузке")
 async def get_atm_cassettes(terminal_id: str):
     """
-    Если ATM опрашивается сборщиком atm_monitor — отдаём реальные кассеты
-    (номинал/количество/статус OK-LOW-MISSING на момент последнего опроса).
+    Если для ATM есть телеметрия кассет (atm_monitor.db) — отдаём её
+    (номинал/количество/статус OK-LOW-MISSING на момент последнего снимка).
     Иначе — оценка: текущий остаток разбивается на 4 номинала пропорционально
     типичной доле в обороте (source="estimated", это не измерение).
     """
@@ -318,8 +308,8 @@ async def get_atm_history(
     days: int = Query(30, ge=1, le=180, description="Сколько дней истории отдать"),
 ):
     """
-    Реальный почасовой ряд остатка UZS из atm_monitor (сборщик monitoring.btech.uz).
-    Пусто, если этот ATM не опрашивается сборщиком или он сейчас недоступен.
+    Почасовой ряд остатка UZS из телеметрии atm_monitor.db.
+    Пусто, если для этого ATM телеметрии нет.
     """
     atm = get_atm(terminal_id)
     live_tid = (atm.get("live_tid") if atm else None) or terminal_id

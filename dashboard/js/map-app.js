@@ -981,7 +981,7 @@ async function loadAtmsFromDb() {
           balance,
           status,
           region:          a.region,
-          // Реальные данные от сборщика atm_monitor (если этот ATM им опрашивается).
+          // Телеметрия atm_monitor (если она есть для этого ATM).
           // live_match: 'terminal_id' — точное совпадение id; 'location' — id в реестре
           // не совпал с id мониторинга (разные сети), совпадение найдено по координатам.
           live:            !!a.live,

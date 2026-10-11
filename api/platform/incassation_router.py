@@ -581,8 +581,19 @@ def build_regional_routes(
 
 
 def assign_calendar_dates(cars: List[Dict[str, Any]], workday_min: int = 8 * 60) -> None:
-    """Pack each viloyat's trips into working days starting today (UTC+5)."""
+    """Pack each viloyat's trips into working days (Mon–Sat, like the ML visit window) from today (UTC+5)."""
     today = datetime.now(_TASHKENT_TZ).date()
+
+    def workday(offset: int):
+        d = today
+        while d.weekday() == 6:
+            d += timedelta(days=1)
+        for _ in range(offset):
+            d += timedelta(days=1)
+            while d.weekday() == 6:
+                d += timedelta(days=1)
+        return d
+
     by_region: Dict[str, List[Dict[str, Any]]] = {}
     for car in cars:
         by_region.setdefault(car["region"], []).append(car)
@@ -606,7 +617,7 @@ def assign_calendar_dates(cars: List[Dict[str, Any]], workday_min: int = 8 * 60)
             if used and used + dur > workday_min:
                 day_offset += 1
                 used = 0
-            planned = today + timedelta(days=day_offset)
+            planned = workday(day_offset)
             car["planned_date"] = planned.isoformat()
             car["priority"] = {0: "critical", 1: "high"}.get(best(car), "planned")
             due = deadline(car)

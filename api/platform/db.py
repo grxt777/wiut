@@ -294,7 +294,7 @@ def _apply_live_state(
 ) -> None:
     """Накладывает реальный баланс/статус агента/прогноз/кассеты от atm_monitor поверх реестра.
 
-    Сначала пробуем точное совпадение terminal_id == tid BTech. Реестр часто
+    Сначала пробуем точное совпадение terminal_id == tid телеметрии. Реестр часто
     заведён под другую сеть (WAY4/UzCard и т.п.) с собственной нумерацией —
     тогда id не совпадёт, хотя это тот же физический банкомат. В этом случае
     подстраховываемся совпадением координат (см. atm_live.find_nearest_tid)."""
@@ -316,7 +316,7 @@ def _apply_live_state(
 
     d["live"] = True
     d["live_match"] = match_method
-    d["live_tid"] = live_tid  # реальный tid BTech — нужен для /cassettes и /history, когда он отличается от terminal_id
+    d["live_tid"] = live_tid  # tid телеметрии — нужен для /cassettes и /history, когда он отличается от terminal_id
     d["agent_status"] = live.get("agent_status")
     d["balance_polled_at"] = live.get("polled_at")
     d["last_incassation"] = live.get("last_incassation")
