@@ -10,8 +10,6 @@ ATM-платформа — FastAPI Backend
     GET   /api/atms/{terminal_id}           → детали ATM
     GET   /api/atms/{terminal_id}/cassettes → кассеты
     GET   /api/atms/{terminal_id}/history   → история остатка
-    POST  /api/atms/import                  → загрузка XLSX реестра ATM
-    POST  /api/branches/import              → загрузка XLSX реестра филиалов
     GET   /api/alerts, /api/baseline        → сигналы и сводка по остаткам
     POST  /api/routes/incassation           → региональные маршруты инкассации
     GET   /api/incassation/calendar         → календарь рейсов
@@ -27,9 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import sys
-import tempfile
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -38,7 +34,7 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # корень проекта: пакеты api, atm_monitor
 
 import uvicorn
-from fastapi import Body, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -53,8 +49,6 @@ from api.platform import atm_live
 from api.platform.config import BASE_DIR
 from api.platform.db import (
     DatabaseUnavailableError,
-    bulk_insert_atms,
-    bulk_insert_branches,
     bulk_update_balances,
     count_atms,
     count_branches,
@@ -67,11 +61,8 @@ from api.platform.db import (
     list_incassation_trips,
     list_regions,
     replace_incassation_trips,
-    truncate_atms,
-    truncate_branches,
     update_balance,
 )
-from api.platform.importer import parse_branches_xlsx, parse_xlsx
 from api.platform.incassation_router import (
     PRIORITY_RANK,
     _clean_osrm_points,
@@ -337,70 +328,6 @@ async def get_atm_history(
 
 
 # ═══════════════════════════════════════════════════════════
-# ИМПОРТ ATM (XLSX)
-# ═══════════════════════════════════════════════════════════
-
-@app.post("/api/atms/import", summary="Импорт ATM из XLSX")
-async def import_atms(
-    file: UploadFile = File(..., description="XLSX с реестром ATM"),
-    replace: bool = Query(False, description="Если True — очистить таблицу перед импортом"),
-):
-    """
-    Ожидаемая структура XLSX:
-      A — Номер банкомата, B — Номер по филиалам, C — Локал код, D — Область,
-      E — Филиал, F — Модель, G — Тип сети, H — Серийный номер, I — Merchant ID,
-      J — Terminal ID, K — Адрес, L — Широта, M — Долгота
-    """
-    parsed = _parse_upload(file, parse_xlsx, "atm_import_")
-    deleted = truncate_atms() if replace else 0
-    stats = bulk_insert_atms(parsed["records"])
-
-    return {
-        "ok": True,
-        "filename": file.filename,
-        "header_row": parsed["header_row"],
-        "columns_detected": parsed["columns"],
-        "total_rows_in_file": parsed["total_rows"],
-        "deleted_before_import": deleted,
-        "imported": stats["inserted"],
-        "updated": stats["updated"],
-        "skipped_no_terminal_id": stats["skipped"],
-        "validation_errors": parsed["errors"][:50],
-        "validation_errors_count": len(parsed["errors"]),
-        "atms_in_db_after": count_atms(),
-    }
-
-
-def _parse_upload(file: UploadFile, parser, prefix: str) -> Dict[str, Any]:
-    """Сохраняет загрузку во временный файл с фиксированным именем и разбирает её.
-
-    Имя от клиента в путь не попадает (иначе `../` уводит запись за пределы
-    временной папки). Любой нечитаемый файл — 400, а не 500."""
-    if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(400, "Ожидается .xlsx файл")
-    tmp_dir = tempfile.mkdtemp(prefix=prefix)
-    tmp_path = os.path.join(tmp_dir, "upload.xlsx")
-    try:
-        with open(tmp_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-        try:
-            return parser(tmp_path)
-        except ValueError as e:
-            raise HTTPException(400, str(e))
-        except Exception as e:
-            log.warning("Не удалось разобрать %s: %s", file.filename, e)
-            raise HTTPException(400, "Не удалось прочитать файл: это не корректный XLSX")
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-
-
-@app.post("/api/atms/import/clear", summary="Очистить все ATM из БД")
-async def clear_atms():
-    deleted = truncate_atms()
-    return {"ok": True, "deleted": deleted, "atms_in_db": count_atms()}
-
-
-# ═══════════════════════════════════════════════════════════
 # ФИЛИАЛЫ
 # ═══════════════════════════════════════════════════════════
 
@@ -442,49 +369,6 @@ async def get_branch_detail(local_code: str):
     if not branch:
         raise HTTPException(404, f"Филиал с local_code={local_code!r} не найден")
     return branch
-
-
-
-
-@app.post("/api/branches/import", summary="Импорт филиалов из XLSX")
-async def import_branches(
-    file: UploadFile = File(..., description="XLSX с реестром филиалов"),
-    replace: bool = Query(False, description="Если True — очистить таблицу перед импортом"),
-):
-    parsed = _parse_upload(file, parse_branches_xlsx, "branch_import_")
-    deleted = truncate_branches() if replace else 0
-    stats = bulk_insert_branches(parsed["records"])
-    without_coordinates = parsed.get("without_coordinates", 0)
-    warning = None
-    if without_coordinates:
-        warning = (
-            f"У {without_coordinates} из {len(parsed['records'])} филиалов нет координат "
-            "(lat/lon) — на карте они не отобразятся. Проверьте колонки широты и долготы "
-            "и загрузите файл снова с галочкой «Очистить таблицу»."
-        )
-
-    return {
-        "ok": True,
-        "filename": file.filename,
-        "header_row": parsed["header_row"],
-        "columns_detected": parsed["columns"],
-        "total_rows_in_file": parsed["total_rows"],
-        "deleted_before_import": deleted,
-        "imported": stats["inserted"],
-        "updated": stats["updated"],
-        "skipped_no_local_code": stats["skipped"],
-        "without_coordinates": without_coordinates,
-        "warning": warning,
-        "validation_errors": parsed["errors"][:50],
-        "validation_errors_count": len(parsed["errors"]),
-        "branches_in_db_after": count_branches(),
-    }
-
-
-@app.post("/api/branches/import/clear", summary="Очистить все филиалы из БД")
-async def clear_branches():
-    deleted = truncate_branches()
-    return {"ok": True, "deleted": deleted, "branches_in_db": count_branches()}
 
 
 # ═══════════════════════════════════════════════════════════

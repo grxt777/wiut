@@ -463,7 +463,6 @@ function openBranchCashPanel(branch) {
       <div class="popup-row">Адрес: <span>${branch.address || '—'}</span></div>
       <div style="margin-top:14px;padding:12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;font-size:13px;line-height:1.45">
         Кассовый остаток для этого филиала не загружен.
-        Импорт: <b>Импорт → Остатки филиалов</b>.
       </div>
       ${equipmentSectionHtml(branch.local_code)}`;
     panel.classList.add('open');
@@ -661,23 +660,20 @@ async function loadBranches() {
 
     if (!branches.length) {
       branchesLoaded = false;
-      alert('В базе нет филиалов. Сначала загрузите реестр через «Импорт филиалов».');
+      alert('В базе нет филиалов.');
       return false;
     }
     if (!plotted) {
       if (warehouseOnly) {
         alert(
-          'Режим «только со складом»: нет филиалов с загруженными остатками.\n\n' +
-          'Сначала Импорт → Остатки филиалов, затем снова включите слой.'
+          'Режим «только со складом»: нет филиалов с загруженными остатками.'
         );
         return false;
       }
       branchesLoaded = false;
       alert(
         `Филиалы в базе: ${branches.length}, но ни у одного нет координат (широта/долгота).\n\n` +
-        'Поэтому на карте они не отображаются.\n\n' +
-        'Загрузите XLSX заново через Импорт → Филиалы, с колонками Lat и Lon ' +
-        '(или двумя колонками «Геолокация») и включите «Очистить таблицу перед импортом».'
+        'Поэтому на карте они не отображаются.'
       );
       return false;
     }

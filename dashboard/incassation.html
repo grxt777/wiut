@@ -3,191 +3,282 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Календарь инкассаций — Cash Flow AI</title>
+  <title>План инкассации — Cash Flow AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="/dashboard/css/ui.css?v=1" />
   <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --line: #e5eaf3;
+      --line-soft: #eef2f7;
+      --text: #111827;
+      --muted: #667085;
+      --faint: #98a2b3;
+      --brand: #2563eb;
+      --brand-soft: #eef4ff;
+      --crit: #dc2626;
+      --crit-soft: #fdecec;
+      --warn: #d97706;
+      --warn-soft: #fdf3e2;
+      --plan: #2563eb;
+      --plan-soft: #eaf1ff;
+      --shadow: 0 1px 2px rgba(16, 24, 40, .06);
+      --shadow-md: 0 12px 28px rgba(16, 24, 40, .08);
+    }
     * { box-sizing: border-box }
-    body { margin: 0; background: #fff; color: #202124; font: 14px Arial, sans-serif }
-    :root { --ui-accent: #6f42c1; --ui-accent-soft: #f3e8ff; --ui-line: #dadce0; }
+    html, body { margin: 0; overflow-x: hidden }
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, .10), transparent 30%),
+        linear-gradient(180deg, #fbfdff 0%, var(--bg) 42%, #eef3fb 100%);
+      background-attachment: fixed;
+      color: var(--text);
+      font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit }
+
     header {
-      height: 64px; border-bottom: 1px solid #dadce0;
-      display: flex; align-items: center; padding: 0 24px; gap: 12px;
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(255, 255, 255, .86); border-bottom: 1px solid var(--line);
+      padding: 14px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      backdrop-filter: blur(18px); box-shadow: var(--shadow);
     }
-    header h1 { font-size: 22px; font-weight: 400; margin: 0 4px 0 0; white-space: nowrap }
-    .logo { color: #6f42c1; display: flex }
-    .month-nav { display: inline-flex; align-items: center; gap: 6px }
-    .month-nav .ui-btn { color: #3c4043 }
-    .month { font-size: 20px; margin-left: 6px; white-space: nowrap }
-    .spacer { flex: 1 }
-    .layout { display: grid; grid-template-columns: 250px 1fr 380px; min-height: calc(100vh - 64px) }
-    aside { border-right: 1px solid #dadce0; padding: 18px 16px }
-    .create { width: 100%; height: 40px; color: #3c4043; box-shadow: 0 1px 3px rgba(60, 64, 67, .18) }
-    .create svg { color: #6f42c1 }
-    .create:disabled { cursor: wait }
-    .mini-title { margin: 27px 0 12px; font-size: 12px; font-weight: bold; color: #5f6368; text-transform: uppercase }
-    .legend { display: flex; align-items: center; gap: 9px; margin: 13px 4px; color: #5f6368 }
-    .dot { height: 10px; width: 10px; border-radius: 50% }
-    .note { font-size: 12px; line-height: 1.55; color: #5f6368; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-top: 25px }
-    .main { overflow: auto }
+    header h1 { font-size: 19px; font-weight: 800; letter-spacing: -.02em; margin: 0; white-space: nowrap }
+    header .badge {
+      background: linear-gradient(135deg, var(--brand), #60a5fa); color: #fff; border-radius: 999px;
+      padding: 4px 11px; font-size: 12px; font-weight: 700; white-space: nowrap;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, .22);
+    }
+    header .spacer { flex: 1 }
+    @media (max-width: 1200px) { header .badge { display: none } }
+
+    main { max-width: 1600px; margin: 0 auto; padding: 22px 28px 48px }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start }
+    .card {
+      background: rgba(255, 255, 255, .94); border: 1px solid var(--line); border-radius: 22px;
+      box-shadow: var(--shadow-md); overflow: hidden;
+    }
+
     .toolbar {
-      height: 64px; display: flex; align-items: center; padding: 0 20px;
-      border-bottom: 1px solid #dadce0; gap: 10px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px;
+      padding: 14px 16px; border-bottom: 1px solid var(--line);
     }
-    .toolbar .ui-seg > button { color: #3c4043 }
-    .toolbar .ui-seg > button.active { color: #fff; background: #6f42c1; box-shadow: none }
-    .status { margin-left: auto; color: #5f6368; font-size: 12px }
-    .calendar { min-width: 900px; display: grid; grid-template-columns: repeat(7, 1fr) }
+    .month-nav { display: inline-flex; align-items: center; gap: 6px }
+    .month { font-size: 18px; font-weight: 800; letter-spacing: -.02em; margin: 0 6px; white-space: nowrap }
+    .toolbar .spacer { flex: 1 }
+    .statusbar .spacer { flex: 1 }
+    .statusbar .ui-seg { background: #fff }
+    .statusbar .ui-seg > button { height: 26px; font-size: 12px }
+    .statusbar .ui-seg > button.active { color: #fff; background: var(--brand); box-shadow: none }
+    .statusbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px 8px 16px;
+      border-bottom: 1px solid var(--line); background: var(--brand-soft);
+      color: var(--muted); font-size: 12.5px; font-weight: 600;
+    }
+    .statusbar svg { width: 15px; height: 15px; color: var(--brand); flex: none }
+
+    .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) }
     .dow {
-      height: 46px; border-bottom: 1px solid #dadce0; text-align: center;
-      padding-top: 12px; font-size: 11px; font-weight: bold; color: #70757a; text-transform: uppercase;
+      padding: 10px 0; text-align: center; font-size: 11px; font-weight: 800;
+      letter-spacing: .06em; color: var(--faint); text-transform: uppercase;
+      border-bottom: 1px solid var(--line); background: var(--surface-2);
     }
     .day {
-      height: calc((100vh - 174px) / 5); min-height: 118px;
-      border-right: 1px solid #e8eaed; border-bottom: 1px solid #e8eaed;
-      padding: 6px; overflow: hidden; cursor: pointer;
+      min-height: 112px; padding: 8px; overflow: hidden; cursor: pointer;
+      border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+      transition: background .15s ease;
     }
     .day:nth-child(7n) { border-right: 0 }
-    .day.selected { background: #f3e8ff; outline: 2px solid #6f42c1; outline-offset: -2px }
+    .day:nth-last-child(-n+7) { border-bottom: 0 }
+    .day:hover { background: #fafcff }
+    .day.selected { background: var(--brand-soft); box-shadow: inset 0 0 0 2px var(--brand) }
     .date {
-      font-size: 12px; color: #5f6368; width: 25px; height: 25px;
-      line-height: 25px; text-align: center; border-radius: 50%; margin-bottom: 4px;
+      width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%;
+      font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 4px;
     }
-    .today .date { background: #6f42c1; color: #fff }
-    .outside { background: #fafafa }
-    .outside .date { color: #adb1b7 }
-    .day-sum { font-size: 10px; color: #5f6368; margin: 0 0 4px; font-weight: 700 }
+    .today .date { background: var(--brand); color: #fff; box-shadow: 0 6px 14px rgba(37, 99, 235, .3) }
+    .outside { background: #fbfcfe }
+    .outside .date { color: #c3cad6 }
+    .day-sum { font-size: 10.5px; color: var(--muted); margin: 0 0 5px; font-weight: 700; line-height: 1.3 }
     .chip {
-      border-radius: 4px; padding: 3px 5px; margin: 2px 0; font-size: 10px;
-      line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      border-radius: 6px; padding: 3px 6px; margin: 3px 0; font-size: 10.5px; font-weight: 600;
+      line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .chip.critical { background: #fce8e6; color: #a50e0e; border-left: 3px solid #d93025 }
-    .chip.high { background: #fef7e0; color: #8d5f00; border-left: 3px solid #f9ab00 }
-    .chip.planned { background: #e8f0fe; color: #174ea6; border-left: 3px solid #4285f4 }
-    .more { font-size: 10px; font-weight: bold; color: #5f6368; padding: 2px 0 }
-    .panel {
-      border-left: 1px solid #dadce0; background: #fafbff;
-      display: flex; flex-direction: column; min-height: 0;
+    .chip.critical { background: var(--crit-soft); color: #b42318; box-shadow: inset 3px 0 0 var(--crit) }
+    .chip.high { background: var(--warn-soft); color: #93500a; box-shadow: inset 3px 0 0 var(--warn) }
+    .chip.planned { background: var(--plan-soft); color: #1d4ed8; box-shadow: inset 3px 0 0 var(--plan) }
+    .more { font-size: 10.5px; font-weight: 700; color: var(--muted); padding: 2px 0 }
+
+    .legend-bar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+      padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface-2);
+      font-size: 12.5px; color: var(--muted);
     }
-    .panel-head { padding: 16px 18px 12px; border-bottom: 1px solid #dadce0; background: #fff }
-    .panel-head h2 { margin: 0; font-size: 15px; font-weight: 700 }
-    .panel-head p { margin: 6px 0 0; color: #5f6368; font-size: 12px }
-    .panel-body { overflow: auto; padding: 10px 12px 20px; flex: 1 }
+    .legend { display: inline-flex; align-items: center; gap: 8px }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex: none }
+    .dot.critical { background: var(--crit) }
+    .dot.high { background: var(--warn) }
+    .dot.planned { background: var(--plan) }
+    .how { margin-left: auto }
+    .how summary {
+      list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      color: var(--brand); font-weight: 700;
+    }
+    .how summary::-webkit-details-marker { display: none }
+    .how summary svg { width: 15px; height: 15px }
+    .how[open] { flex-basis: 100%; margin-left: 0 }
+    .how p { margin: 10px 0 2px; line-height: 1.6; color: var(--muted); max-width: 920px }
+
+    .panel { position: sticky; top: 86px; display: flex; flex-direction: column; max-height: calc(100vh - 110px) }
+    .panel-head { padding: 16px 18px 14px; border-bottom: 1px solid var(--line) }
+    .panel-head .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--faint) }
+    .panel-head h2 { margin: 4px 0 0; font-size: 17px; font-weight: 800; letter-spacing: -.02em }
+    .panel-head h2::first-letter { text-transform: uppercase }
+    .panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px }
+    .panel-body { overflow: auto; padding: 12px; flex: 1; background: var(--surface-2) }
+    .empty-panel { padding: 28px 12px; text-align: center; color: var(--muted); font-size: 13px }
     .region-card {
-      background: #fff; border: 1px solid #e8eaed; border-radius: 10px;
-      margin-bottom: 10px; overflow: hidden;
+      background: #fff; border: 1px solid var(--line); border-radius: 14px;
+      margin-bottom: 10px; overflow: hidden; box-shadow: var(--shadow);
     }
     .region-card h3 {
-      margin: 0; padding: 10px 12px; font-size: 13px;
+      margin: 0; padding: 11px 14px; font-size: 13.5px; font-weight: 800;
       display: flex; justify-content: space-between; gap: 8px; align-items: center;
-      background: #f8f9fa; border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--line-soft);
     }
-    .region-card h3 span { color: #5f6368; font-weight: 600; font-size: 11px }
-    .trip {
-      padding: 9px 12px; border-bottom: 1px solid #f1f3f4; cursor: pointer; font-size: 12px;
-    }
+    .region-card h3 span { color: var(--muted); font-weight: 600; font-size: 11.5px; text-align: right }
+    .trip { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); cursor: pointer; font-size: 12.5px; transition: background .15s ease }
     .trip:last-child { border-bottom: 0 }
-    .trip:hover { background: #f8f5ff }
-    .trip b { display: block; margin-bottom: 3px }
-    .trip .meta { color: #5f6368; font-size: 11px }
-    .prio { font-size: 10px; font-weight: 800; text-transform: uppercase }
-    .prio.critical { color: #d93025 }
-    .prio.high { color: #e37400 }
-    .prio.planned { color: #1a73e8 }
-    .event {
-      border-radius: 4px; padding: 4px 6px; margin: 3px 0; font-size: 11px;
-      line-height: 1.28; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .trip:hover { background: #f7faff }
+    .trip b { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; font-weight: 700 }
+    .trip .meta { color: var(--muted); font-size: 11.5px }
+    .prio {
+      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em;
+      padding: 2px 7px; border-radius: 999px;
     }
-    .event.critical { background: #fce8e6; color: #a50e0e; border-left: 3px solid #d93025 }
-    .event.high { background: #fef7e0; color: #8d5f00; border-left: 3px solid #f9ab00 }
-    .event.planned { background: #e8f0fe; color: #174ea6; border-left: 3px solid #4285f4 }
+    .prio.critical { color: #b42318; background: var(--crit-soft) }
+    .prio.high { color: #93500a; background: var(--warn-soft) }
+    .prio.planned { color: #1d4ed8; background: var(--plan-soft) }
+
     .modal {
-      position: fixed; inset: 0; background: #0006; display: none;
-      align-items: center; justify-content: center; z-index: 10;
+      position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: none;
+      align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(3px);
     }
     .modal.open { display: flex }
     .dialog {
-      width: min(560px, calc(100vw - 28px)); max-height: 86vh;
-      background: #fff; border-radius: 10px; box-shadow: 0 12px 30px #0005; overflow: auto;
+      width: min(580px, calc(100vw - 28px)); max-height: 86vh; overflow: auto;
+      background: #fff; border-radius: 20px; box-shadow: 0 24px 60px rgba(15, 23, 42, .25);
     }
-    .dialog-head { padding: 17px 20px; background: #6f42c1; color: #fff; font-size: 17px }
-    .dialog-body { padding: 20px; line-height: 1.7 }
-    .kv { display: grid; grid-template-columns: 155px 1fr; border-bottom: 1px solid #eee; padding: 8px 0 }
-    .kv b { color: #5f6368 }
-    .close { float: right; background: none; border: 0; color: #fff; font-size: 22px; cursor: pointer }
-    .stops { margin: 0; padding-left: 18px; font-size: 13px }
-    @media (max-width: 1100px) {
+    .dialog-head {
+      position: sticky; top: 0; background: #fff; z-index: 1;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 17px; font-weight: 800;
+    }
+    .dialog-body { padding: 8px 20px 20px; line-height: 1.6; font-size: 13.5px }
+    .kv { display: grid; grid-template-columns: 150px 1fr; gap: 12px; border-bottom: 1px solid var(--line-soft); padding: 9px 0 }
+    .kv b { color: var(--muted); font-weight: 600 }
+    .kv.alert span { color: var(--crit); font-weight: 600 }
+    .stops { margin: 0; padding-left: 18px; font-size: 12.5px }
+    .dialog-actions { margin-top: 16px }
+
+    @media (max-width: 1280px) {
+      main { padding: 18px 18px 40px }
+      .layout { grid-template-columns: minmax(0, 1fr) 310px; gap: 14px }
+      .day { min-height: 100px; padding: 6px }
+      .month { font-size: 16px; margin: 0 2px }
+    }
+    @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr }
-      .side {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
-        border-right: 0; border-bottom: 1px solid #dadce0; padding: 12px;
-      }
-      .side .create { width: auto }
-      .side .legend { margin: 0 }
-      .side .mini-title, .side .note { display: none }
-      .panel { border-left: 0; border-top: 1px solid #dadce0; min-height: 320px }
-      header { padding: 0 12px }
-      .month { font-size: 16px }
-      .calendar { min-width: 760px }
+      .panel { position: static; max-height: none }
+      .panel-body { max-height: 520px }
+    }
+    @media (max-width: 760px) {
+      header { padding: 10px 16px; gap: 10px }
+      main { padding: 16px 12px 40px }
+      .toolbar { padding: 12px }
+      .day { min-height: 84px; padding: 5px }
+      .day-sum, .chip, .more { display: none }
+      .day.has-events .date { box-shadow: 0 0 0 2px var(--brand) inset }
+      .kv { grid-template-columns: 1fr; gap: 2px }
     }
   </style>
 </head>
 <body>
   <header>
-    <span class="logo"><i data-lucide="calendar-days"></i></span>
-    <h1>Инкассации</h1>
-    <div class="month-nav">
-      <button class="ui-btn ui-btn--ghost ui-btn--icon" type="button" onclick="changeMonth(-1)" title="Предыдущий месяц" aria-label="Предыдущий месяц"><i data-lucide="chevron-left"></i></button>
-      <button class="ui-btn ui-btn--ghost ui-btn--icon" type="button" onclick="changeMonth(1)" title="Следующий месяц" aria-label="Следующий месяц"><i data-lucide="chevron-right"></i></button>
-      <button class="ui-btn ui-btn--ghost" type="button" onclick="today()">Сегодня</button>
-    </div>
-    <span class="month" id="month"></span>
+    <h1>План инкассации</h1>
+    <span class="badge">Ipak Yo'li Bank · Ташкент</span>
     <span class="spacer"></span>
     <nav data-app-nav></nav>
-    <script src="/dashboard/js/app-nav.js?v=1"></script>
+    <script src="/dashboard/js/app-nav.js?v=2"></script>
   </header>
-  <div class="layout">
-    <aside class="side">
-      <button class="ui-btn ui-btn--ghost create" id="rebuildBtn" type="button" onclick="rebuildPlan()">
-        <i data-lucide="sparkles"></i> Обновить план
-      </button>
-      <div class="mini-title">Маршруты</div>
-      <div class="legend"><span class="dot" style="background:#d93025"></span> Критично (деньги закончатся до ближайшего выезда или остаток &lt; 20%)</div>
-      <div class="legend"><span class="dot" style="background:#f9ab00"></span> Предупреждение (ML: выезд нужен в ближайший рабочий день)</div>
-      <div class="legend"><span class="dot" style="background:#4285f4"></span> Плановый выезд</div>
-      <div class="note">
-        <b>Как считается</b><br>
-        Срок визита и сумма загрузки — из ML-прогноза спроса (XGBoost) по истории транзакций: выезд, пока с вероятностью 99%
-        хватает остатка, загрузка — на цикл с тем же запасом. Банкоматы с остатком &lt; 20% едут в любом случае;
-        для банкоматов без прогноза — пороги остатка (&lt; 20% / &lt; 40%). Рейс выходит из филиала «Инкассация = 1» своего вилоята.
-        Даты — рабочие дни по 8 часов, начиная с сегодня (UTC+5).
-      </div>
-    </aside>
-    <section class="main">
-      <div class="toolbar">
-        <div class="ui-seg" role="group" aria-label="Горизонт плана">
-          <button type="button" class="active" data-horizon="2" onclick="setHorizon(2, this)">2 дня</button>
-          <button type="button" data-horizon="7" onclick="setHorizon(7, this)">7 дней</button>
-          <button type="button" data-horizon="14" onclick="setHorizon(14, this)">14 дней</button>
+
+  <main>
+    <div class="layout">
+      <section class="card">
+        <div class="toolbar">
+          <div class="month-nav">
+            <button class="ui-btn ui-btn--ghost ui-btn--icon" type="button" onclick="changeMonth(-1)" title="Предыдущий месяц" aria-label="Предыдущий месяц"><i data-lucide="chevron-left"></i></button>
+            <button class="ui-btn ui-btn--ghost ui-btn--icon" type="button" onclick="changeMonth(1)" title="Следующий месяц" aria-label="Следующий месяц"><i data-lucide="chevron-right"></i></button>
+            <button class="ui-btn ui-btn--ghost" type="button" onclick="today()">Сегодня</button>
+          </div>
+          <span class="month" id="month"></span>
+          <span class="spacer"></span>
+          <button class="ui-btn ui-btn--primary" id="rebuildBtn" type="button" onclick="rebuildPlan()">
+            <i data-lucide="sparkles"></i> Обновить план
+          </button>
         </div>
-        <span class="status" id="status">Загрузка календаря…</span>
-      </div>
-      <div class="calendar" id="dow"></div>
-      <div class="calendar" id="grid"></div>
-    </section>
-    <aside class="panel">
-      <div class="panel-head">
-        <h2 id="panelTitle">Регионы дня</h2>
-        <p id="panelMeta">Выберите день в календаре</p>
-      </div>
-      <div class="panel-body" id="panelBody">
-        <div class="empty-panel">Нажмите на дату — рейсы сгруппируются по вилоятам.</div>
-      </div>
-    </aside>
-  </div>
-  <div class="modal" id="modal">
+        <div class="statusbar">
+          <i data-lucide="route"></i><span class="status" id="status">Загрузка календаря…</span>
+          <span class="spacer"></span>
+          <div class="ui-seg" role="group" aria-label="Горизонт плана">
+            <button type="button" class="active" data-horizon="2" onclick="setHorizon(2, this)">2 дня</button>
+            <button type="button" data-horizon="7" onclick="setHorizon(7, this)">7 дней</button>
+            <button type="button" data-horizon="14" onclick="setHorizon(14, this)">14 дней</button>
+          </div>
+        </div>
+        <div class="calendar" id="dow"></div>
+        <div class="calendar" id="grid"></div>
+        <div class="legend-bar">
+          <span class="legend"><span class="dot critical"></span>Критично — деньги закончатся до ближайшего выезда или остаток &lt; 20%</span>
+          <span class="legend"><span class="dot high"></span>Предупреждение — ML: выезд нужен в ближайший рабочий день</span>
+          <span class="legend"><span class="dot planned"></span>Плановый выезд</span>
+          <details class="how">
+            <summary><i data-lucide="info"></i>Как считается</summary>
+            <p>
+              Срок визита и сумма загрузки — из ML-прогноза спроса (XGBoost) по истории транзакций: выезд, пока с вероятностью 99%
+              хватает остатка, загрузка — на цикл с тем же запасом. Банкоматы с остатком &lt; 20% едут в любом случае;
+              для банкоматов без прогноза — пороги остатка (&lt; 20% / &lt; 40%). Рейс выходит из филиала «Инкассация = 1» своего вилоята.
+              Даты — рабочие дни по 8 часов, начиная с сегодня (UTC+5).
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <aside class="card panel">
+        <div class="panel-head">
+          <div class="eyebrow">Рейсы дня</div>
+          <h2 id="panelTitle">Регионы дня</h2>
+          <p id="panelMeta">Выберите день в календаре</p>
+        </div>
+        <div class="panel-body" id="panelBody">
+          <div class="empty-panel">Нажмите на дату — рейсы сгруппируются по вилоятам.</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div class="modal" id="modal" onclick="if (event.target === this) closeModal()">
     <div class="dialog">
-      <div class="dialog-head">Карточка рейса <button class="close" type="button" onclick="closeModal()">×</button></div>
+      <div class="dialog-head">
+        Карточка рейса
+        <button class="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm" type="button" onclick="closeModal()" aria-label="Закрыть"><i data-lucide="x"></i></button>
+      </div>
       <div class="dialog-body" id="dialog"></div>
     </div>
   </div>
@@ -282,7 +373,8 @@
         const groups = groupByRegion(dayEvents);
         const isToday = k === todayKey();
         const sel = k === selectedDay ? ' selected' : '';
-        html += `<div class="day ${d.getMonth() !== cursor.getMonth() ? 'outside' : ''} ${isToday ? 'today' : ''}${sel}" onclick="selectDay('${k}')">`;
+        const has = dayEvents.length ? ' has-events' : '';
+        html += `<div class="day ${d.getMonth() !== cursor.getMonth() ? 'outside' : ''} ${isToday ? 'today' : ''}${sel}${has}" onclick="selectDay('${k}')">`;
         html += `<div class="date">${d.getDate()}</div>`;
         if (dayEvents.length) {
           const atms = dayEvents.reduce((s, e) => s + stopCount(e), 0);
@@ -353,7 +445,7 @@
     }
     function setHorizon(n, btn) {
       horizon = n;
-      document.querySelectorAll('.toolbar button[data-horizon]').forEach((x) => x.classList.remove('active'));
+      document.querySelectorAll('button[data-horizon]').forEach((x) => x.classList.remove('active'));
       btn.classList.add('active');
       events = visibleEvents();
       setStatus();
@@ -389,7 +481,7 @@
         console.error(e);
         document.getElementById('status').textContent = 'Ошибка загрузки: ' + (e.message || e);
         document.getElementById('grid').innerHTML =
-          '<div style="grid-column:1/-1;padding:40px;color:#a50e0e;font-weight:700">Не удалось загрузить календарь. Обновите страницу или нажмите «Обновить план».</div>';
+          '<div style="grid-column:1/-1;padding:40px;color:var(--crit);font-weight:700">Не удалось загрузить календарь. Обновите страницу или нажмите «Обновить план».</div>';
       }
     }
 
@@ -442,11 +534,12 @@
         <div class="kv"><b>Время в пути</b><span>${e.est_time_min != null ? e.est_time_min + ' мин' : '—'}</span></div>
         <div class="kv"><b>Дистанция</b><span>${e.distance_km != null ? e.distance_km + ' км' : '—'}</span></div>
         <div class="kv"><b>Довезти</b><span>${moneyMln(e.recommended_refill)}</span></div>
-        <div class="kv"><b>Приоритет</b><span>${e.priority || '—'}</span></div>
-        ${e.late ? `<div class="kv"><b>Внимание</b><span style="color:#a50e0e">Дата рейса позже срока визита (${e.deadline}) — нужна ещё одна машина</span></div>` : ''}
+        <div class="kv"><b>Приоритет</b><span><span class="prio ${e.priority || 'planned'}">${({ critical: 'Критично', high: 'Предупреждение', planned: 'План' })[e.priority] || e.priority || '—'}</span></span></div>
+        ${e.late ? `<div class="kv alert"><b>Внимание</b><span>Дата рейса позже срока визита (${e.deadline}) — нужна ещё одна машина</span></div>` : ''}
         <div class="kv"><b>Остановки (${stops.length})</b><span>${stopHtml}</span></div>
-        <p style="margin-top:15px"><a href="/dashboard/map.html?trip=${encodeURIComponent(e.id || '')}" target="_self" style="color:#6f42c1;font-weight:700">Открыть карту</a></p>`;
+        <div class="dialog-actions"><a class="ui-btn ui-btn--primary" href="/dashboard/map.html?trip=${encodeURIComponent(e.id || '')}"><i data-lucide="map"></i>Открыть на карте</a></div>`;
       document.getElementById('modal').classList.add('open');
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
     }
 
     window.closeModal = closeModal;

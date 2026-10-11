@@ -5,14 +5,8 @@
     ['/dashboard/atm-analytics.html', 'radar', 'Мониторинг', 'Мониторинг и прогноз'],
     ['/dashboard/analytics.html', 'bar-chart-3', 'Аналитика', 'Аналитика ATM'],
     ['/dashboard/incassation.html', 'calendar-days', 'Инкассация', 'Календарь инкассации'],
-    ['/dashboard/import.html', 'file-spreadsheet', 'Импорт', 'Импорт реестров'],
   ];
-  const ALIASES = {
-    '/dashboard/import-atms.html': '/dashboard/import.html',
-    '/dashboard/import-branches.html': '/dashboard/import.html',
-  };
-  const path = location.pathname;
-  const active = ALIASES[path] || path;
+  const active = location.pathname;
 
   document.querySelectorAll('nav[data-app-nav]').forEach(nav => {
     nav.classList.add('app-nav');

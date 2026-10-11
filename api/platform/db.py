@@ -432,15 +432,6 @@ def list_branches(region: Optional[str] = None) -> List[Dict[str, Any]]:
 # ATM — ЗАПИСЬ
 # ═══════════════════════════════════════════════════════════
 
-def truncate_atms() -> int:
-    """Удаляет все ATM, возвращает количество удалённых строк."""
-    with _connect() as conn:
-        n = int(conn.execute("SELECT COUNT(*) AS c FROM atms").fetchone()["c"])
-        conn.execute("DELETE FROM atms")
-        conn.execute("DELETE FROM sqlite_sequence WHERE name = 'atms'")
-    return n
-
-
 def bulk_insert_atms(records: List[Dict[str, Any]]) -> Dict[str, int]:
     """Массовая вставка/обновление банкоматов по terminal_id."""
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
@@ -555,14 +546,6 @@ def get_branch(local_code: str) -> Optional[Dict[str, Any]]:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM branches WHERE local_code = ?", (local_code,)).fetchone()
     return dict(row) if row else None
-
-
-def truncate_branches() -> int:
-    with _connect() as conn:
-        n = int(conn.execute("SELECT COUNT(*) AS c FROM branches").fetchone()["c"])
-        conn.execute("DELETE FROM branches")
-        conn.execute("DELETE FROM sqlite_sequence WHERE name = 'branches'")
-    return n
 
 
 def bulk_insert_branches(records: List[Dict[str, Any]]) -> Dict[str, int]:
