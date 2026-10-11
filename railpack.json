@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "build": {
+      "commands": [
+        "python -m api.analytics.build"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "sh -c 'python -m uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
+  }
+}
